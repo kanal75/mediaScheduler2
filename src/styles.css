@@ -1,20 +1,83 @@
-.example-wrapper {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
+.p-tag {
+  display: initial !important;
+  /* ...existing code... */
 }
 
-#myGrid {
-    flex: 1 1 0px;
+::v-deep(.p-multiselect-panel) {
+  max-height: 1400px !important;
+  /* Increase dropdown height to show more tags */
 }
 
-label.checkbox {
-    display: inline-block;
-    user-select: none;
-    margin: 20px;
+/* PrimeVue MultiSelect: Make tags and dropdown items compact and show more tags */
+.p-multiselect-panel {
+  max-height: 500px !important;
+  height: 400px !important;
+  overflow-y: auto !important;
 }
 
-.fa-hourglass-half {
-    color: navy;
-    font-size: 18px;
+.p-multiselect-items-wrapper {
+  max-height: 400px !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+}
+
+.p-multiselect-token {
+  font-size: 0.65rem !important;
+  padding: 0 4px !important;
+  margin: 0 1px 0 0 !important;
+  border-radius: 4px !important;
+  min-height: 16px !important;
+  line-height: 1.1 !important;
+  height: 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+.p-multiselect .p-multiselect-label {
+  min-height: 18px !important;
+  padding: 1px 2px !important;
+}
+
+.p-multiselect .p-multiselect-token-icon {
+  font-size: 0.8em !important;
+  margin-left: 2px !important;
+}
+
+.p-multiselect-items .p-multiselect-item {
+  margin: 0 !important;
+  padding: 0 6px !important;
+  min-height: 22px !important;
+  line-height: 1.1 !important;
+}
+
+.p-multiselect-items .p-multiselect-item .p-checkbox {
+  margin-right: 2px !important;
+  margin-left: 0 !important;
+  padding: 0 !important;
+  vertical-align: middle !important;
+}
+
+.p-multiselect-items .p-multiselect-item .p-checkbox-box {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  min-height: 14px !important;
+}
+
+.p-multiselect-items .p-multiselect-item .p-checkbox-icon {
+  font-size: 0.7em !important;
+}
+
+.p-multiselect-items .p-multiselect-item .p-checkbox+span {
+  font-size: 0.8em !important;
+  padding-left: 2px !important;
+}
+
+.p-multiselect {
+  min-height: 24px !important;
+  padding: 0 !important;
+}
+
+.p-selectbutton .p-togglebutton {
+  width: inherit !important;
 }

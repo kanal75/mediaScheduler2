@@ -1,23 +1,33 @@
 <template>
   <div class="editor-container">
-    <v-select
-      v-model="selectedTagIds"
-      :items="allTagOptions"
-      item-title="label"
-      item-value="value"
-      multiple
-      chips
-      small-chips
-      label="Select Tags"
-      class="tag-editor"
-    ></v-select>
-    <v-btn icon @click="save"><v-icon>mdi-check</v-icon></v-btn>
-    <v-btn icon @click="cancel"><v-icon>mdi-close</v-icon></v-btn>
+    <div style="display: flex; align-items: center; width: 100%">
+      <MultiSelect
+        v-model="selectedTagIds"
+        :options="groupedTagOptions"
+        display="chip"
+        placeholder="Select Tags"
+        class="w-full"
+        filter
+        optionGroupLabel="label"
+        optionGroupChildren="items"
+        optionLabel="label"
+        optionValue="value"
+        ref="multiSelectRef"
+      >
+        <template #footer>
+          <div style="display: flex; justify-content: flex-end; width: 100%">
+            <Button class="p-button-sm" label="OK" @click="okAndClose" />
+          </div>
+        </template>
+      </MultiSelect>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, computed } from "vue";
+import { useRootStore } from "@/store/RootStore";
+import type { Group, Tag } from "@/types";
 
 export default defineComponent({
   name: "TagsCellEditor",
@@ -25,51 +35,66 @@ export default defineComponent({
     params: { type: Object, required: true },
   },
   setup(props) {
-    // The current value from the cell
-    const initialTags = props.params.value || [];
+    const rootStore = useRootStore();
+    const initialTags: string[] = props.params.value || [];
     const selectedTagIds = ref([...initialTags]);
+    const multiSelectRef = ref<any>(null);
 
-    // Hard-coded or store-driven options:
-    const allTagOptions = [
-      { label: "Monday", value: "Monday" },
-      { label: "Tuesday", value: "Tuesday" },
-      { label: "Wednesday", value: "Wednesday" },
-      // ...
-    ];
+    // Grouped options for MultiSelect
+    const groupedTagOptions = computed(() =>
+      rootStore.scheduleTagsGroups.map((group: Group) => ({
+        label: group.Id,
+        items: (Array.isArray(group.Tag)
+          ? group.Tag
+          : group.Tag
+          ? [group.Tag]
+          : []
+        ).map((tag: Tag) => ({
+          label: tag.Id,
+          value: tag.Id,
+        })),
+      }))
+    );
 
     const save = () => {
-      // Return new value to AG Grid
       props.params.api.stopEditing();
-      props.params.setValue(selectedTagIds.value);
     };
-
     const cancel = () => {
-      // Discard changes
       props.params.api.stopEditing(true);
     };
+    const getValue = () => {
+      // Persist the updated tags to the backend
+      rootStore.upsertSchedule({
+        ...props.params.data,
+        scheduleTags: selectedTagIds.value,
+      });
+      return selectedTagIds.value;
+    };
 
-    onMounted(() => {
-      // Focus logic if needed
-    });
+    const closeMultiSelect = () => {
+      if (multiSelectRef.value) {
+        multiSelectRef.value.hide();
+      }
+    };
+
+    const okAndClose = () => {
+      if (multiSelectRef.value) {
+        multiSelectRef.value.hide();
+      }
+      // Also close the editing mode
+      props.params.api.stopEditing();
+    };
 
     return {
       selectedTagIds,
-      allTagOptions,
+      groupedTagOptions,
       save,
       cancel,
+      getValue,
+      multiSelectRef,
+      closeMultiSelect,
+      okAndClose,
     };
   },
 });
 </script>
-
-<style>
-.editor-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tag-editor {
-  min-width: 150px;
-}
-</style>

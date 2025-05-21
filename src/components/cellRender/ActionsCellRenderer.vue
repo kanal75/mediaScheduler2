@@ -1,41 +1,59 @@
 <template>
-  <div class="button-container">
-    <!-- Delete button -->
-    <v-btn
-      variant="outlined"
-      class="action-btn"
-      density="compact"
-      @click="onDelete"
-    >
-      <v-icon class="icon">mdi-delete-outline</v-icon>
-    </v-btn>
+  <div class="button-container" :class="{ disabled: !isLoggedIn }">
+    <!-- Only render buttons if params.data exists -->
+    <template v-if="params.data">
+      <!-- Delete button -->
+      <v-btn
+        variant="outlined"
+        class="action-btn delete-btn"
+        density="compact"
+        @click="onDelete"
+        :disabled="!isLoggedIn"
+      >
+        <v-icon class="icon">mdi-delete-outline</v-icon>
+      </v-btn>
 
-    <!-- Edit button (toggles editing on the 'scheduleTags' column) -->
-    <v-btn
-      variant="outlined"
-      :color="editing ? 'warning' : undefined"
-      class="action-btn"
-      density="compact"
-      @click="toggleEdit"
-    >
-      <v-icon class="icon">mdi-pencil-outline</v-icon>
-    </v-btn>
+      <!-- Copy button -->
+      <v-btn
+        variant="outlined"
+        class="action-btn copy-btn"
+        density="compact"
+        @click="onCopy"
+        :disabled="!isLoggedIn"
+      >
+        <v-icon class="icon">mdi-content-copy</v-icon>
+      </v-btn>
 
-    <!-- Copy button -->
-    <v-btn
-      variant="outlined"
-      class="action-btn"
-      density="compact"
-      @click="onCopy"
-    >
-      <v-icon class="icon">mdi-content-copy</v-icon>
-    </v-btn>
+      <!-- Pause/Play button -->
+      <v-btn
+        variant="outlined"
+        class="action-btn play-btn"
+        density="compact"
+        v-if="params.data.status === 'Paused'"
+        @click="onResume"
+        :disabled="!isLoggedIn"
+      >
+        <v-icon class="icon">mdi-play</v-icon>
+      </v-btn>
+      <v-btn
+        variant="outlined"
+        class="action-btn pause-btn"
+        density="compact"
+        v-else
+        @click="onPause"
+        :disabled="!isLoggedIn"
+      >
+        <v-icon class="icon">mdi-pause</v-icon>
+      </v-btn>
+    </template>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useRootStore } from "@/store/RootStore";
+import { useNotificationStore } from "@/store/NotificationStore";
+import { useAccountStore } from "@/store/AccountStore";
 
 export default defineComponent({
   name: "ActionsCellRenderer",
@@ -44,17 +62,35 @@ export default defineComponent({
   },
   setup(props) {
     const rootStore = useRootStore();
+    const accountStore = useAccountStore();
+    const notificationStore = useNotificationStore();
 
     // State to track whether this row is currently in edit mode
     const editing = ref(false);
 
-    const onDelete = () => {
+    const isLoggedIn = computed(() => !!accountStore.account);
+
+    const onDelete = async () => {
       if (window.confirm("Are you sure you want to delete this item?")) {
         props.params.api.applyTransaction({ remove: [props.params.data] });
+        await rootStore.deleteSchedule(props.params.data);
+        notificationStore.showToast({
+          severity: "success",
+          summary: "Delete",
+          detail: "Item deleted successfully.",
+          life: 3000,
+        });
+      } else {
+        notificationStore.showToast({
+          severity: "info",
+          summary: "Delete",
+          detail: "Delete cancelled.",
+          life: 2000,
+        });
       }
     };
 
-    const onCopy = () => {
+    const onCopy = async () => {
       const currentRowIndex = props.params.node.rowIndex;
       const newSchedule = { ...props.params.data, id: Date.now().toString() };
 
@@ -69,39 +105,85 @@ export default defineComponent({
         add: [newSchedule],
         addIndex: currentRowIndex + 1,
       });
+
+      await rootStore.upsertSchedule(newSchedule);
+
+      notificationStore.showToast({
+        severity: "success",
+        summary: "Copy",
+        detail: "Row copied successfully.",
+        life: 3000,
+      });
+    };
+
+    // Pause the schedule by setting its status to 'Paused'
+    const onPause = async () => {
+      const schedule = props.params.data;
+      schedule.status = "Paused";
+      await rootStore.upsertSchedule(schedule);
+      notificationStore.showToast({
+        severity: "info",
+        summary: "Pause",
+        detail: "Schedule paused.",
+        life: 2000,
+      });
+    };
+
+    // Resume the schedule by clearing 'Paused' and letting RootStore logic set status
+    const onResume = async () => {
+      const schedule = props.params.data;
+      // Remove 'Paused' status so RootStore logic will set it based on timePicker
+      schedule.status = undefined;
+      await rootStore.upsertSchedule(schedule);
+      notificationStore.showToast({
+        severity: "info",
+        summary: "Resume",
+        detail: "Schedule resumed.",
+        life: 2000,
+      });
     };
 
     // Start editing the scheduleTags cell in this row
-    const startEditing = () => {
+    const startEditingTags = () => {
       props.params.api.startEditingCell({
         rowIndex: props.params.node.rowIndex,
         colKey: "scheduleTags",
       });
-      editing.value = true;
     };
 
-    // Stop editing, which in turn saves changes by default
-    const stopEditing = () => {
-      // The default stopEditing() saves changes
-      // If you want to discard changes instead, use stopEditing(true)
-      props.params.api.stopEditing(false);
-      editing.value = false;
+    // Start editing the timePicker cell in this row
+    const startEditingTimePicker = () => {
+      props.params.api.startEditingCell({
+        rowIndex: props.params.node.rowIndex,
+        colKey: "timePicker",
+      });
     };
 
-    // Toggles editing mode
-    const toggleEdit = () => {
-      if (!editing.value) {
-        startEditing();
-      } else {
-        stopEditing();
+    // Listen for editing stopped event to chain editors
+    function onEditingStopped(event: any) {
+      if (
+        event.rowIndex === props.params.node.rowIndex &&
+        event.column.getColId() === "scheduleTags"
+      ) {
+        // After tags editor closes, open timePicker
+        setTimeout(() => {
+          startEditingTimePicker();
+        }, 0);
+        // Remove listener after use
+        props.params.api.removeEventListener(
+          "cellEditingStopped",
+          onEditingStopped
+        );
       }
-    };
-
+    }
     return {
       onDelete,
       onCopy,
-      toggleEdit,
       editing,
+      onPause,
+      onResume,
+      rootStore,
+      isLoggedIn,
     };
   },
 });
@@ -123,6 +205,19 @@ export default defineComponent({
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: transparent;
   margin-right: 4px;
+}
+
+.delete-btn .icon {
+  color: #d32f2f; /* red */
+}
+.copy-btn .icon {
+  color: #ffb743; /* warning (amber) */
+}
+.play-btn .icon {
+  color: #388e3c; /* green */
+}
+.pause-btn .icon {
+  color: #0288d1; /* info (blue) */
 }
 
 .icon {

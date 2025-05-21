@@ -1,17 +1,12 @@
 <template>
   <div class="tags-cell">
-    <v-chip
+    <Tag
       v-for="(tag, i) in tags"
       :key="i"
-      label
-      small
+      :value="tag"
       class="ma-1"
-      color="primary"
-      text-color="white"
-    >
-      <v-icon icon="mdi-label" start></v-icon>
-      {{ tag }}
-    </v-chip>
+      severity="info"
+    />
   </div>
 </template>
 
@@ -40,5 +35,18 @@ export default defineComponent({
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
+}
+
+.tags-cell .ma-1 {
+  margin: 2px;
+  padding-top: 0px;
+  padding-bottom: 0px;
+}
+
+.tags-cell .p-tag {
+  padding-top: 1px;
+  padding-bottom: 1px;
+  line-height: 1.2;
+  font-size: 1em;
 }
 </style>

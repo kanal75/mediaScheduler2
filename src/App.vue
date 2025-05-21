@@ -1,25 +1,60 @@
 <template>
   <v-app>
     <v-main>
+      <SystemDialog />
       <ToolBar />
       <router-view />
+      <Toast position="top-center" group="tc" />
     </v-main>
   </v-app>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, watch, onMounted } from "vue";
 import ToolBar from "@/components/ToolBar.vue";
+import { useRefStore } from "@/store/RefStore";
+import { useAccountStore } from "@/store/AccountStore";
+import { useToast } from "primevue/usetoast";
+import { storeToRefs } from "pinia";
+import { useNotificationStore } from "@/store/NotificationStore";
+import SystemDialog from "./components/SystemDialog.vue";
 
 export default defineComponent({
   name: "App",
   components: {
     ToolBar,
+    SystemDialog,
   },
-  data() {
-    return {
-      //
-    };
+  setup() {
+    const refStore = useRefStore();
+    const accountStore = useAccountStore();
+    const toast = useToast();
+    const notificationStore = useNotificationStore();
+    const { toast: toastMessage } = storeToRefs(notificationStore);
+    onMounted(() => {
+      document.documentElement.classList.toggle(
+        "app-dark",
+        refStore.isDarkMode
+      );
+    });
+    watch(
+      () => accountStore.account?.settings.isDarkMode,
+      (isDark) => {
+        if (typeof isDark === "boolean") {
+          refStore.setDarkMode(isDark);
+          // Ensure .app-dark class is updated when theme changes after login/profile load
+          document.documentElement.classList.toggle("app-dark", isDark);
+        }
+      },
+      { immediate: true }
+    );
+    watch(toastMessage, (val) => {
+      if (val) {
+        toast.add(val);
+        notificationStore.clearToast();
+      }
+    });
+    return { refStore };
   },
 });
 </script>
