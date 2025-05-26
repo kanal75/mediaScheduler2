@@ -43,6 +43,12 @@
               class="p-button-secondary"
               @click="resetMedia"
             />
+            <Button
+              label="Refresh Tree"
+              icon="pi pi-sync"
+              class="p-button-warning"
+              @click="refreshTree"
+            />
           </div>
           <div class="flex-1"></div>
           <div class="flex justify-end">
@@ -90,11 +96,17 @@ export default defineComponent({
 
     const closeDialog = () => {
       refStore.showMediaDialog = false;
+      rootStore.resetNewSchedule();
       rootStore.selectedFile = null;
     };
 
     const resetMedia = () => {
       rootStore.selectedFile = null;
+    };
+
+    const refreshTree = async () => {
+      rootStore.treeData = null;
+      await rootStore.fetchTreeData();
     };
 
     const onDialogClose = () => {
@@ -118,6 +130,7 @@ export default defineComponent({
       resetMedia,
       onDialogClose,
       onDialogVisibleChange,
+      refreshTree,
     };
   },
 });

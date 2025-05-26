@@ -40,7 +40,9 @@ export default defineComponent({
     const selectedKey = ref<Record<string, boolean> | undefined>(undefined);
 
     onMounted(async () => {
-      await rootStore.fetchTreeData();
+      if (!rootStore.treeData) {
+        await rootStore.fetchTreeData();
+      }
       isTreeLoading.value = false;
     });
 

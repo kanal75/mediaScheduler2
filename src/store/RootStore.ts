@@ -287,6 +287,10 @@ export const useRootStore = defineStore("RootStore", {
 
     // Fetch and transform the tree data.
     async fetchTreeData() {
+      if (this.treeData) {
+        // Already loaded, do not fetch again
+        return;
+      }
       try {
         const response = await axios.get(`${baseURL}SCAN_FILES/SCAN?type=copy`);
         let rawData = response.data;
@@ -298,7 +302,6 @@ export const useRootStore = defineStore("RootStore", {
         ) {
           rawData = rawData[0]._custom.value;
         }
-
         this.treeData = rawData;
       } catch (error) {
         const notificationStore = useNotificationStore();

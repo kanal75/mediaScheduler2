@@ -1,116 +1,127 @@
 <template>
   <v-card class="pa-4 elevation-2">
-    <div v-if="selectedFolder && fileImages.length > 0">
-      <!-- Full-screen gallery view (Galleria component) -->
-      <Galleria
-        v-if="displayCustom"
-        v-model:activeIndex="activeIndex"
-        v-model:visible="displayCustom"
-        :value="fileImages"
-        :responsiveOptions="responsiveOptions"
-        :numVisible="7"
-        containerStyle="max-width: 850px"
-        :circular="true"
-        :fullScreen="true"
-        :showItemNavigators="true"
-        :showThumbnails="false"
-      >
-        <template #item="slotProps">
-          <!-- Natural sizing for images -->
-          <div class="cursor-pointer" @click="imageClick(activeIndex)">
-            <v-img
-              :src="slotProps.item.thumbnailImageSrc"
-              :alt="slotProps.item.alt"
-              width="100%"
-              aspect-ratio="16/9"
-              style="object-fit: cover; border-radius: 8px"
-              height="216"
-              @error="
-                slotProps.item.thumbnailImageSrc = require('@/assets/logo.png')
-              "
-            />
-          </div>
-        </template>
-        <template #thumbnail="slotProps">
-          <div>
-            <v-img
-              :src="slotProps.item.thumbnailImageSrc"
-              :alt="slotProps.item.alt"
-              width="100%"
-              aspect-ratio="16/9"
-              style="object-fit: cover; border-radius: 8px"
-              height="216"
-              @error="
-                slotProps.item.thumbnailImageSrc = require('@/assets/logo.png')
-              "
-            />
-          </div>
-        </template>
-      </Galleria>
-
-      <!-- Thumbnails grid -->
-      <div
-        class="mt-4"
-        style="
-          max-height: calc(100vh - 220px);
-          overflow-y: auto;
-          padding-bottom: 2rem;
-        "
-      >
-        <v-container fluid>
-          <v-row dense style="row-gap: 24px">
-            <v-col
-              v-for="(image, index) in fileImages"
-              :key="index"
-              cols="12"
-              md="4"
-            >
-              <div class="d-flex flex-column align-center">
-                <!-- Use native <img> for thumbnail, like ImagesCellRenderer.vue -->
-                <img
-                  v-if="image.thumbnailImageSrc"
-                  :src="image.thumbnailImageSrc"
-                  class="thumbnail"
-                  @click="openDialog(index)"
-                  :alt="image.alt"
-                  @error="onImgError"
-                />
-                <div style="font-size: 12px; color: #888; margin-top: 4px">
-                  {{ image.created }}
-                </div>
-                <v-btn
-                  color="primary"
-                  block
-                  class="ma-0 mt-2"
-                  @click="selectFile(index)"
-                >
-                  Select
-                </v-btn>
-              </div>
-            </v-col>
-          </v-row>
-        </v-container>
-      </div>
-      <!-- Dialog for full-size image preview -->
-      <v-dialog v-model="dialog" max-width="50%">
-        <v-card>
-          <v-img
-            v-if="dialogIndex !== null && fileImages[dialogIndex]"
-            :src="fileImages[dialogIndex].thumbnailImageSrc"
-            contain
-            class="pa-4"
-            height="216"
-            width="100%"
-            @error="
-              fileImages[
-                dialogIndex
-              ].thumbnailImageSrc = require('@/assets/logo.png')
-            "
-          />
-        </v-card>
-      </v-dialog>
+    <div
+      v-if="rootStore.treeData === null"
+      class="d-flex justify-center align-center"
+      style="min-height: 200px"
+    >
+      <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="4" />
     </div>
-    <div v-else class="pa-2">No folder selected.</div>
+    <div v-else>
+      <!-- existing gallery content -->
+      <div v-if="selectedFolder && fileImages.length > 0">
+        <!-- Full-screen gallery view (Galleria component) -->
+        <Galleria
+          v-if="displayCustom"
+          v-model:activeIndex="activeIndex"
+          v-model:visible="displayCustom"
+          :value="fileImages"
+          :responsiveOptions="responsiveOptions"
+          :numVisible="7"
+          containerStyle="max-width: 850px"
+          :circular="true"
+          :fullScreen="true"
+          :showItemNavigators="true"
+          :showThumbnails="false"
+        >
+          <template #item="slotProps">
+            <!-- Natural sizing for images -->
+            <div class="cursor-pointer" @click="imageClick(activeIndex)">
+              <v-img
+                :src="slotProps.item.thumbnailImageSrc"
+                :alt="slotProps.item.alt"
+                width="100%"
+                aspect-ratio="16/9"
+                style="object-fit: cover; border-radius: 8px"
+                height="216"
+                @error="
+                  slotProps.item.thumbnailImageSrc = require('@/assets/logo.png')
+                "
+              />
+            </div>
+          </template>
+          <template #thumbnail="slotProps">
+            <div>
+              <v-img
+                :src="slotProps.item.thumbnailImageSrc"
+                :alt="slotProps.item.alt"
+                width="100%"
+                aspect-ratio="16/9"
+                style="object-fit: cover; border-radius: 8px"
+                height="216"
+                @error="
+                  slotProps.item.thumbnailImageSrc = require('@/assets/logo.png')
+                "
+              />
+            </div>
+          </template>
+        </Galleria>
+
+        <!-- Thumbnails grid -->
+        <div
+          class="mt-4"
+          style="
+            max-height: calc(100vh - 220px);
+            overflow-y: auto;
+            padding-bottom: 2rem;
+          "
+        >
+          <v-container fluid>
+            <v-row dense style="row-gap: 24px">
+              <v-col
+                v-for="(image, index) in fileImages"
+                :key="index"
+                cols="12"
+                md="4"
+              >
+                <div class="d-flex flex-column align-center">
+                  <!-- Use native <img> for thumbnail, like ImagesCellRenderer.vue -->
+                  <img
+                    v-if="image.thumbnailImageSrc"
+                    :src="image.thumbnailImageSrc"
+                    class="thumbnail"
+                    @click="openDialog(index)"
+                    :alt="image.alt"
+                    @error="onImgError"
+                  />
+                  <div style="font-size: 12px; color: #888; margin-top: 4px">
+                    {{ image.created }}
+                  </div>
+                  <v-btn
+                    color="primary"
+                    block
+                    class="ma-0 mt-2"
+                    @click="selectFile(index)"
+                  >
+                    Select
+                  </v-btn>
+                </div>
+              </v-col>
+            </v-row>
+          </v-container>
+        </div>
+
+        <!-- Dialog for full-size image preview -->
+        <v-dialog v-model="dialog" max-width="50%">
+          <v-card>
+            <v-img
+              v-if="dialogIndex !== null && fileImages[dialogIndex]"
+              :src="fileImages[dialogIndex].thumbnailImageSrc"
+              contain
+              class="pa-4"
+              height="216"
+              width="100%"
+              @error="
+                fileImages[
+                  dialogIndex
+                ].thumbnailImageSrc = require('@/assets/logo.png')
+              "
+            />
+          </v-card>
+        </v-dialog>
+      </div>
+      <div v-else class="pa-2">No folder selected.</div>
+    </div>
   </v-card>
 </template>
 
@@ -241,6 +252,7 @@ export default defineComponent({
       dialogIndex,
       openDialog,
       onImgError,
+      rootStore,
     };
   },
 });

@@ -62,6 +62,9 @@ export default defineComponent({
       async ([profile, scheduleTypes]) => {
         if (profile !== "" && scheduleTypes !== "") {
           if (profile !== "system" && scheduleTypes !== "System") {
+            // Reset dialog state before opening
+            rootStore.setSelectedFile(null);
+            rootStore.setSelectedFolder(null);
             refStore.showMediaDialog = true;
             refStore.showSystemDialog = false;
           } else if (scheduleTypes === "System") {

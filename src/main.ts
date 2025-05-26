@@ -111,6 +111,7 @@ import Select from "primevue/select";
 import InputGroup from "primevue/inputgroup";
 import InputNumber from "primevue/inputnumber";
 import InputGroupAddon from "primevue/inputgroupaddon";
+import ProgressSpinner from "primevue/progressspinner";
 
 app.component("Button", Button);
 app.component("Tag", Tag);
@@ -143,6 +144,7 @@ app.component("Select", Select);
 app.component("InputGroup", InputGroup);
 app.component("InputNumber", InputNumber);
 app.component("InputGroupAddon", InputGroupAddon);
+app.component("ProgressSpinner", ProgressSpinner);
 
 const vuetify = createVuetify({
   theme: {
