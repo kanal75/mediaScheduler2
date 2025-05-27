@@ -77,7 +77,7 @@ export default defineComponent({
       }
       return selectedFile.value
         ? selectedFile.value.Data?.Url?.Thumbnail || ""
-        : "https://primefaces.org/cdn/primevue/images/usercard.png";
+        : "/assets/usercard.png";
     });
 
     // Title: The file's title or BSKEY as a fallback.

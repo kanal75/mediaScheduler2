@@ -14,14 +14,12 @@ import { createPinia } from "pinia"; // ✅ Pinia for state management
 import { useRefStore } from "@/store/RefStore";
 import { createVuetify } from "vuetify"; // ✅ Vuetify UI framework
 import "vuetify/styles"; // ✅ Vuetify styles
-import { loadFonts } from "./plugins/webfontloader";
 import "@mdi/font/css/materialdesignicons.css";
 import "./styles.css";
 
 // 🔹 Import Vue Date Picker (Optional)
 import VueDatePicker from "@vuepic/vue-datepicker";
 import "@vuepic/vue-datepicker/dist/main.css";
-loadFonts();
 
 const app = createApp(App);
 const pinia = createPinia();

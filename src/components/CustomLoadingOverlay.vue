@@ -1,15 +1,10 @@
 <template>
   <div class="ag-overlay-loading-center" role="presentation">
-    <div
-      role="presentation"
-      style="
-        height: 100px;
-        width: 100px;
-        background: url(https://www.ag-grid.com/images/ag-grid-loading-spinner.svg)
-          center / contain no-repeat;
-        margin: 0 auto;
-      "
-    ></div>
+    <img
+      src="/assets/ag-grid-loading-spinner.svg"
+      alt="Loading..."
+      style="height: 100px; width: 100px; display: block; margin: 0 auto"
+    />
     <div aria-live="polite" aria-atomic="true">
       {{ params?.loadingMessage }}
     </div>
@@ -31,7 +26,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
+<style>
 .ag-overlay-loading-center {
   display: flex;
   flex-direction: column;

@@ -4,14 +4,7 @@
  * webfontloader documentation: https://github.com/typekit/webfontloader
  */
 
+// Google Fonts loading removed. This file is now a no-op.
 export async function loadFonts() {
-  const webFontLoader = await import(
-    /* webpackChunkName: "webfontloader" */ "webfontloader"
-  );
-
-  webFontLoader.load({
-    google: {
-      families: ["Roboto:100,300,400,500,700,900&display=swap"],
-    },
-  });
+  // No-op: Google Fonts loading disabled for local fonts only
 }
