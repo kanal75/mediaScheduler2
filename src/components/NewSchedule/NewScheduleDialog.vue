@@ -29,6 +29,7 @@
       </Splitter>
     </Dialog>
     <MediaDialog v-if="refStore.showMediaDialog" />
+    <SystemDialog />
   </div>
 </template>
 
@@ -39,6 +40,7 @@ import { useRootStore } from "@/store/RootStore";
 import NewScheduleForm from "@/components/NewSchedule/NewScheduleForm.vue";
 import NewScheduleCard from "@/components/NewSchedule/NewScheduleCard.vue";
 import MediaDialog from "@/components/NewSchedule/MediaDialog.vue";
+import SystemDialog from "@/components/NewSchedule/SystemDialog.vue";
 
 export default defineComponent({
   name: "NewScheduleDialog",
@@ -46,6 +48,7 @@ export default defineComponent({
     NewScheduleForm,
     NewScheduleCard,
     MediaDialog,
+    SystemDialog,
   },
   setup() {
     const refStore = useRefStore();

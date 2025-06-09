@@ -146,7 +146,7 @@ import { useSystemStore } from "@/store/SystemStore";
 import { useRootStore } from "@/store/RootStore";
 import { useRefStore } from "@/store/RefStore";
 import { useToast } from "primevue/usetoast";
-import type { Leg } from "../types";
+import type { Leg } from "../../types";
 import dayjs from "dayjs";
 import moment from "moment";
 

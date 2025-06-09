@@ -22,7 +22,7 @@ import { defineComponent } from "vue";
 import { useRootStore } from "@/store/RootStore";
 import { useRefStore } from "@/store/RefStore";
 import { useSystemStore } from "@/store/SystemStore";
-import SystemForm from "@/components/SystemForm.vue";
+import SystemForm from "@/components/NewSchedule/SystemForm.vue";
 
 export default defineComponent({
   name: "SystemDialog",

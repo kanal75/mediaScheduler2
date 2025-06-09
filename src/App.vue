@@ -1,7 +1,6 @@
 <template>
   <v-app>
     <v-main>
-      <SystemDialog />
       <ToolBar />
       <router-view />
       <Toast position="top-center" group="tc" />
@@ -17,13 +16,11 @@ import { useAccountStore } from "@/store/AccountStore";
 import { useToast } from "primevue/usetoast";
 import { storeToRefs } from "pinia";
 import { useNotificationStore } from "@/store/NotificationStore";
-import SystemDialog from "./components/SystemDialog.vue";
 
 export default defineComponent({
   name: "App",
   components: {
     ToolBar,
-    SystemDialog,
   },
   setup() {
     const refStore = useRefStore();

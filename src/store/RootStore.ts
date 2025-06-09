@@ -230,7 +230,7 @@ export const useRootStore = defineStore("RootStore", {
       this.isTagsLoading = true;
       try {
         const response = await axios.get<ScheduleTags>(
-          `${baseURL}MEDIASCHEDULER/ScheduleTags?type=copy`
+          `${baseURL}MEDIASCHEDULER/ScheduleTags?type=copy&hidebonsainodes=true`
         );
         this.setScheduleTagsGroups(response.data);
       } catch (error) {
@@ -241,7 +241,17 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Error fetching schedule tags groups.",
           life: 3000,
         });
-        console.error("Error fetching schedule tags groups:", error);
+        // Enhanced error logging
+        if (axios.isAxiosError && axios.isAxiosError(error)) {
+          console.error(
+            "Error fetching schedule tags groups:",
+            error.message,
+            error.response?.data,
+            error.config
+          );
+        } else {
+          console.error("Error fetching schedule tags groups:", error);
+        }
       } finally {
         this.isTagsLoading = false;
       }
@@ -258,9 +268,34 @@ export const useRootStore = defineStore("RootStore", {
           : [scheduleTags.Group];
       }
 
-      this.scheduleTagsGroups = groups.sort((a, b) =>
-        a.BSKEY.localeCompare(b.BSKEY)
-      );
+      // Normalize: convert ScheduleTag to Tag for any group
+      groups = groups.map((group: Group & { ScheduleTag?: Tag | Tag[] }) => {
+        if (group.ScheduleTag) {
+          group.Tag = Array.isArray(group.ScheduleTag)
+            ? group.ScheduleTag
+            : [group.ScheduleTag];
+          delete group.ScheduleTag;
+        }
+        if (group.Tag && !Array.isArray(group.Tag)) {
+          group.Tag = [group.Tag];
+        }
+        return group;
+      });
+
+      // Debug: log normalized groups
+      console.log("Normalized groups:", JSON.parse(JSON.stringify(groups)));
+
+      // Replace the array to ensure reactivity
+      this.scheduleTagsGroups = [...groups].sort((a, b) => {
+        // Put 'MyTags' (case-insensitive) first
+        const aIsMyTags = (a.Id || "").toLowerCase() === "mytags";
+        const bIsMyTags = (b.Id || "").toLowerCase() === "mytags";
+        if (aIsMyTags && !bIsMyTags) return -1;
+        if (!aIsMyTags && bIsMyTags) return 1;
+        const aKey = a.BSKEY || a.Id || "";
+        const bKey = b.BSKEY || b.Id || "";
+        return aKey.localeCompare(bKey);
+      });
 
       this.scheduleTags = groups.reduce((acc: Tag[], group: Group) => {
         if (group.Tag) {
@@ -279,7 +314,7 @@ export const useRootStore = defineStore("RootStore", {
     },
 
     updateScheduleTags(scheduleId: string, newTags: string[]) {
-      const schedule = this.schedules.find((s: any) => s.id === scheduleId);
+      const schedule = this.schedules.find((s: Item) => s.id === scheduleId);
       if (schedule) {
         schedule.scheduleTags = newTags;
       }
@@ -435,6 +470,90 @@ export const useRootStore = defineStore("RootStore", {
         },
       });
       this.resetMedia();
+    },
+
+    // Add a new tag to a group and push to API
+    async pushTagToGroup(groupId: string, tag: Tag) {
+      try {
+        // Find the group
+        const group = this.scheduleTagsGroups.find((g) => g.Id === groupId);
+        if (!group) {
+          throw new Error(`Group '${groupId}' not found`);
+        }
+        // Prepare the payload structure as expected by the backend
+        // prettier-ignore
+        const payload = {
+          Id: group.Id,
+          BSKEY: group.BSKEY,
+        };
+        // Use PUT for idempotent upsert
+        await axios.put(
+          `${baseURL}MEDIASCHEDULER/ScheduleTags/Group[Id='${groupId}']/ScheduleTag[Id='${tag.Id}']`,
+          payload
+        );
+        // Update local state
+        if (Array.isArray(group.Tag)) {
+          // Replace if tag exists, else push
+          const idx = group.Tag.findIndex((t) => t.Id === tag.Id);
+          if (idx !== -1) {
+            group.Tag[idx] = tag;
+          } else {
+            group.Tag.push(tag);
+          }
+        } else if (group.Tag) {
+          if (group.Tag.Id === tag.Id) {
+            group.Tag = [tag];
+          } else {
+            group.Tag = [group.Tag, tag];
+          }
+        } else {
+          group.Tag = [tag];
+        }
+        console.log("Tag upserted:", tag);
+        await this.fetchScheduleTagsGroups();
+        const notificationStore = useNotificationStore();
+        notificationStore.showToast({
+          severity: "success",
+          summary: "Tags",
+          detail: `Tag '${tag.Id}' upserted to '${groupId}'.`,
+          life: 3000,
+        });
+      } catch (error) {
+        const notificationStore = useNotificationStore();
+        notificationStore.showToast({
+          severity: "error",
+          summary: "Tags",
+          detail: `Error upserting tag to '${groupId}'.`,
+          life: 3000,
+        });
+        throw error;
+      }
+    },
+
+    // Delete a tag from a group (for MyTags)
+    async deleteTagFromGroup(groupId: string, tagId: string) {
+      try {
+        await axios.delete(
+          `${baseURL}MEDIASCHEDULER/ScheduleTags/Group[Id='${groupId}']/ScheduleTag[Id='${tagId}']`
+        );
+        await this.fetchScheduleTagsGroups();
+        const notificationStore = useNotificationStore();
+        notificationStore.showToast({
+          severity: "success",
+          summary: "Tags",
+          detail: `Tag '${tagId}' deleted from '${groupId}'.`,
+          life: 3000,
+        });
+      } catch (error) {
+        const notificationStore = useNotificationStore();
+        notificationStore.showToast({
+          severity: "error",
+          summary: "Tags",
+          detail: `Error deleting tag '${tagId}' from '${groupId}'.`,
+          life: 3000,
+        });
+        throw error;
+      }
     },
   },
 });
