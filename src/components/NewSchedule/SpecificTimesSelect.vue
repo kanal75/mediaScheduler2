@@ -5,42 +5,85 @@
       <div class="custom-input-group-content">
         <div v-if="enabled">
           <div
-            v-for="(range, idx) in localRanges"
+            v-for="(item, idx) in localRanges"
             :key="idx"
             class="specific-times-row"
           >
+            <div
+              class="all-week-checkbox"
+              style="
+                margin-right: 12px;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+              "
+            >
+              <input
+                type="checkbox"
+                :id="`allweek-${idx}`"
+                :checked="item.days.length === 7"
+                @change="toggleAllWeek(idx, $event)"
+              />
+              <label :for="`allweek-${idx}`">All Week</label>
+            </div>
+            <div class="weekday-selectors">
+              <Button
+                v-for="(day, dIdx) in weekdays"
+                :key="dIdx"
+                :label="day.short"
+                :class="['weekday-btn', { selected: item.days.includes(dIdx) }]"
+                @click="toggleDay(idx, dIdx)"
+                type="button"
+                size="small"
+              />
+            </div>
+            <div class="all-day-checkbox">
+              <input
+                type="checkbox"
+                :id="`allday-${idx}`"
+                v-model="item.allDay"
+                @change="setAllDay(idx)"
+              />
+              <label :for="`allday-${idx}`">All Day</label>
+            </div>
             <Calendar
-              v-model="localRanges[idx][0]"
+              v-model="item.range[0]"
               timeOnly
               placeholder="From"
               :showIcon="true"
               :hideOnDateTimeSelect="true"
               class="schedule-input"
-              style="width: 180px"
+              :disabled="item.allDay"
             />
-            <span><i class="pi pi-arrow-right" /></span>
+            <span><Icon name="arrow-right" /></span>
             <Calendar
-              v-model="localRanges[idx][1]"
+              v-model="item.range[1]"
               timeOnly
               placeholder="To"
               :showIcon="true"
               :hideOnDateTimeSelect="true"
               class="schedule-input"
-              style="width: 180px"
+              :disabled="item.allDay"
             />
             <Button
-              icon="pi pi-plus"
-              class="p-button-rounded p-button-success p-button-sm"
+              class="p-button-rounded p-button-success p-button-sm themed-action-btn"
               @click="add"
               title="Add"
-            />
+            >
+              <template #icon>
+                <Icon name="plus" />
+              </template>
+            </Button>
             <Button
-              icon="pi pi-minus"
-              class="p-button-rounded p-button-danger p-button-sm"
+              class="p-button-rounded p-button-danger p-button-sm themed-action-btn"
               :disabled="localRanges.length === 1"
               @click="remove(idx)"
               title="Remove"
-            />
+            >
+              <template #icon>
+                <Icon name="minus" />
+              </template>
+            </Button>
           </div>
         </div>
       </div>
@@ -56,9 +99,31 @@
 import { defineComponent, ref, computed, watch } from "vue";
 import { useRootStore } from "@/store/RootStore";
 import isEqual from "lodash/isEqual";
+import Calendar from "primevue/calendar";
+import Button from "primevue/button";
+import InputSwitch from "primevue/inputswitch";
+import Icon from "@/components/icons/Icon.vue";
+
+const weekdays = [
+  { short: "Mon", long: "Monday" },
+  { short: "Tue", long: "Tuesday" },
+  { short: "Wed", long: "Wednesday" },
+  { short: "Thu", long: "Thursday" },
+  { short: "Fri", long: "Friday" },
+  { short: "Sat", long: "Saturday" },
+  { short: "Sun", long: "Sunday" },
+];
+
+type SpecificTimeRange = {
+  days: (number | string)[];
+  from: string;
+  to: string;
+  allDay?: boolean;
+};
 
 export default defineComponent({
   name: "SpecificTimesSelect",
+  components: { Calendar, Button, InputSwitch, Icon },
   setup() {
     const rootStore = useRootStore();
 
@@ -81,27 +146,74 @@ export default defineComponent({
     function getDefaultRange() {
       const now = new Date();
       const end = new Date(now.getTime() + 60 * 60 * 1000);
-      return [now, end];
+      return { days: [0], range: [now, end] as [Date, Date], allDay: false };
     }
 
     const initialEnabled = ref(!!rootStore.newSchedule.specificTime);
     const initialRanges = ref(
       Array.isArray(rootStore.newSchedule.specificTimes) &&
         rootStore.newSchedule.specificTimes.length
-        ? rootStore.newSchedule.specificTimes.map((r: string[]) => [
-            parseTime(r[0]),
-            parseTime(r[1]),
-          ])
+        ? rootStore.newSchedule.specificTimes.map((r: SpecificTimeRange) => {
+            return {
+              days: Array.isArray(r.days) ? r.days : [1],
+              range: [parseTime(r.from), parseTime(r.to)] as [Date, Date],
+              allDay: r.allDay || false,
+            };
+          })
         : [getDefaultRange()]
     );
     const enabled = ref(initialEnabled.value);
     const localRanges = ref(
       initialRanges.value.length &&
-        initialRanges.value[0][0] &&
-        initialRanges.value[0][1]
-        ? initialRanges.value.map((r) => [r[0], r[1]] as [Date, Date])
+        initialRanges.value[0].range[0] &&
+        initialRanges.value[0].range[1]
+        ? initialRanges.value.map((r) => ({
+            days: r.days,
+            range: [r.range[0], r.range[1]] as [Date, Date],
+            allDay: r.allDay || false,
+          }))
         : [getDefaultRange()]
     );
+
+    function toggleDay(idx: number, dayIdx: number) {
+      const days = localRanges.value[idx].days;
+      localRanges.value[idx].days = days.filter((d) => {
+        if (typeof d === "number") return d !== dayIdx;
+        if (typeof d === "string")
+          return weekdays.findIndex((w) => w.long === d) !== dayIdx;
+        return true;
+      });
+      if (!days.includes(dayIdx)) {
+        localRanges.value[idx].days = [
+          ...localRanges.value[idx].days,
+          dayIdx,
+        ].sort((a, b) => {
+          const aIdx =
+            typeof a === "number" ? a : weekdays.findIndex((w) => w.long === a);
+          const bIdx =
+            typeof b === "number" ? b : weekdays.findIndex((w) => w.long === b);
+          return aIdx - bIdx;
+        });
+      }
+    }
+
+    function setAllDay(idx: number) {
+      const item = localRanges.value[idx];
+      if (item.allDay) {
+        const d = new Date();
+        const from = new Date(d.setHours(0, 0, 0, 0));
+        const to = new Date(d.setHours(23, 59, 0, 0));
+        item.range = [from, to];
+      }
+    }
+
+    function toggleAllWeek(idx: number, event: Event) {
+      if ((event.target as HTMLInputElement).checked) {
+        localRanges.value[idx].days = weekdays.map((_, i) => i);
+      } else {
+        localRanges.value[idx].days = [];
+      }
+    }
 
     const isComplete = computed(() => {
       if (!enabled.value) return true;
@@ -109,29 +221,34 @@ export default defineComponent({
         Array.isArray(localRanges.value) &&
         localRanges.value.length > 0 &&
         localRanges.value.every(
-          (arr) =>
-            Array.isArray(arr) &&
-            arr.length === 2 &&
-            arr[0] instanceof Date &&
-            arr[1] instanceof Date &&
-            arr[0] < arr[1]
+          (item) =>
+            Array.isArray(item.range) &&
+            item.range.length === 2 &&
+            item.range[0] instanceof Date &&
+            item.range[1] instanceof Date &&
+            item.range[0] < item.range[1] &&
+            Array.isArray(item.days) &&
+            item.days.length > 0
         )
       );
     });
     const timeError = computed(() => {
       if (!enabled.value) return "";
-      for (const arr of localRanges.value) {
-        if (!arr[0] || !arr[1]) {
+      for (const item of localRanges.value) {
+        if (!item.range[0] || !item.range[1]) {
           return "Start and end time are required.";
         }
         if (
-          Array.isArray(arr) &&
-          arr.length === 2 &&
-          arr[0] instanceof Date &&
-          arr[1] instanceof Date &&
-          arr[0] >= arr[1]
+          Array.isArray(item.range) &&
+          item.range.length === 2 &&
+          item.range[0] instanceof Date &&
+          item.range[1] instanceof Date &&
+          item.range[0] >= item.range[1]
         ) {
           return "Start time must be before end time.";
+        }
+        if (!item.days || !item.days.length) {
+          return "At least one weekday must be selected.";
         }
       }
       return "";
@@ -149,9 +266,16 @@ export default defineComponent({
       [enabled, localRanges],
       () => {
         const newTimes = enabled.value
-          ? (localRanges.value
-              .map((arr) => [formatTime(arr[0]), formatTime(arr[1])])
-              .filter((arr) => arr.length === 2) as [string, string][])
+          ? localRanges.value
+              .map((item) => ({
+                days: item.days.map((dIdx) =>
+                  typeof dIdx === "number" ? weekdays[dIdx].long : dIdx
+                ),
+                from: formatTime(item.range[0]),
+                to: formatTime(item.range[1]),
+                allDay: item.allDay || false,
+              }))
+              .filter((item) => item.days.length && item.from && item.to)
           : [];
         if (
           !isEqual(rootStore.newSchedule.specificTimes, newTimes) ||
@@ -168,8 +292,15 @@ export default defineComponent({
       () => rootStore.newSchedule.specificTimes,
       (newVal) => {
         const localTimes = localRanges.value
-          .map((arr) => [formatTime(arr[0]), formatTime(arr[1])])
-          .filter((arr) => arr.length === 2);
+          .map((item) => ({
+            days: item.days.map((dIdx) =>
+              typeof dIdx === "number" ? weekdays[dIdx].long : dIdx
+            ),
+            from: formatTime(item.range[0]),
+            to: formatTime(item.range[1]),
+            allDay: item.allDay || false,
+          }))
+          .filter((item) => item.days.length && item.from && item.to);
         if (!isEqual(newVal, localTimes)) {
           if (!newVal || !newVal.length) {
             enabled.value = false;
@@ -177,8 +308,24 @@ export default defineComponent({
           } else {
             enabled.value = true;
             localRanges.value = newVal
-              .map((r) => [parseTime(r[0]), parseTime(r[1])])
-              .filter((arr) => arr[0] && arr[1]) as [Date, Date][];
+              .map(function (r: SpecificTimeRange) {
+                // Convert weekday names back to indices if needed
+                const dayIndices = Array.isArray(r.days)
+                  ? r.days
+                      .map((day) =>
+                        typeof day === "string"
+                          ? weekdays.findIndex((w) => w.long === day)
+                          : day
+                      )
+                      .filter((idx) => idx !== -1)
+                  : [1];
+                return {
+                  days: dayIndices,
+                  range: [parseTime(r.from), parseTime(r.to)] as [Date, Date],
+                  allDay: r.allDay || false,
+                };
+              })
+              .filter((item) => item.range[0] && item.range[1]);
           }
         }
       },
@@ -192,6 +339,10 @@ export default defineComponent({
       timeError,
       add,
       remove,
+      weekdays,
+      toggleDay,
+      setAllDay,
+      toggleAllWeek,
     };
   },
 });
@@ -203,10 +354,13 @@ export default defineComponent({
   font-size: 0.85rem;
 }
 .schedule-input {
-  width: 100%;
-  max-width: 400px;
-  min-width: 180px;
+  width: 100% !important;
+  max-width: 150px !important;
+  min-width: 150px !important;
   box-sizing: border-box;
+  height: 32px;
+  font-size: 0.95rem;
+  padding: 2px 8px;
 }
 .custom-input-group {
   display: flex;
@@ -249,16 +403,82 @@ export default defineComponent({
   gap: 16px;
   flex-wrap: wrap;
 }
+.all-week-checkbox {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+  gap: 4px;
+}
+.weekday-selectors {
+  display: flex;
+  gap: 4px;
+  margin-right: 12px;
+}
+.weekday-btn {
+  min-width: 32px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--input-border-color, #d1d5db);
+  background: var(--el-fill-color, var(--p-input-bg, inherit));
+  color: var(--el-text-color-regular, var(--p-text-color, inherit));
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+@media (prefers-color-scheme: dark) {
+  .weekday-btn {
+    border-color: var(--el-border-color, #444);
+  }
+}
+.weekday-btn.selected {
+  background: var(--el-color-primary, var(--p-primary-color, #1976d2));
+  color: var(--el-color-primary-text, var(--p-primary-color-text, #fff));
+  border-color: var(--el-color-primary, var(--p-primary-color, #1976d2));
+}
+@media (prefers-color-scheme: dark) {
+  .weekday-btn.selected {
+    background: #1565c0 !important;
+    color: #fff !important;
+    border-color: #1565c0 !important;
+  }
+}
+.all-day-checkbox {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+  gap: 4px;
+}
+.themed-action-btn {
+  margin-left: 4px;
+  margin-right: 4px;
+  border: 1px solid var(--input-border-color, #d1d5db);
+  background: var(--el-fill-color, var(--p-input-bg, #fff));
+  color: var(--el-text-color-regular, var(--p-text-color, #333));
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  height: 32px;
+  min-width: 32px;
+  font-size: 0.95rem;
+  padding: 2px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.themed-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (prefers-color-scheme: dark) {
+  .themed-action-btn {
+    border-color: var(--el-border-color, #444);
+    background: var(--el-fill-color, #222);
+    color: var(--el-text-color-regular, #fff);
+  }
+}
 @media (max-width: 600px) {
   .specific-times-row {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
-  }
-  .schedule-input {
-    min-width: 0;
-    width: 100%;
-    max-width: 100%;
   }
 }
 </style>

@@ -3,7 +3,7 @@
     <Dialog
       v-model:visible="refStore.showNewScheduleDialog"
       header="Add New Schedule"
-      :style="{ width: '60vw' }"
+      :style="{ width: '80vw' }"
       contentStyle="max-height: 80vh; overflow-y: auto;"
       :baseZIndex="10000"
       :closeOnEscape="true"
@@ -17,13 +17,13 @@
         <!-- Left Panel: align form top‐left, fill height -->
         <SplitterPanel
           class="flex flex-col items-start justify-start h-full"
-          :size="55"
+          :size="65"
         >
           <NewScheduleForm @validity-change="onFormValidityChange" />
         </SplitterPanel>
 
         <!-- Right Panel: fill height -->
-        <SplitterPanel class="p-0 h-full" :size="45">
+        <SplitterPanel class="p-0 h-full" :size="35">
           <NewScheduleCard />
         </SplitterPanel>
       </Splitter>
@@ -41,6 +41,9 @@ import NewScheduleForm from "@/components/NewSchedule/NewScheduleForm.vue";
 import NewScheduleCard from "@/components/NewSchedule/NewScheduleCard.vue";
 import MediaDialog from "@/components/NewSchedule/MediaDialog.vue";
 import SystemDialog from "@/components/NewSchedule/SystemDialog.vue";
+import Dialog from "primevue/dialog";
+import Splitter from "primevue/splitter";
+import SplitterPanel from "primevue/splitterpanel";
 
 export default defineComponent({
   name: "NewScheduleDialog",
@@ -49,6 +52,9 @@ export default defineComponent({
     NewScheduleCard,
     MediaDialog,
     SystemDialog,
+    Dialog,
+    Splitter,
+    SplitterPanel,
   },
   setup() {
     const refStore = useRefStore();

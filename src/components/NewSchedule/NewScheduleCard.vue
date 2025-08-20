@@ -4,23 +4,31 @@
       <!-- Header: Use the selected file's thumbnail as the header image -->
       <template #header>
         <div class="header-image-wrapper" style="width: 100%; overflow: hidden">
-          <v-img
+          <img
             :src="selectedFileThumbnail"
             alt="File Thumbnail"
+            style="
+              width: 100%;
+              height: auto;
+              cursor: pointer;
+              object-fit: contain;
+            "
             @click="openDialog"
+            @error="(e:any)=> (e.target.src = logo)"
           />
-          <v-dialog v-model="dialog" max-width="80%" attach="body">
-            <v-card>
-              <v-img
-                :src="selectedFileThumbnail"
-                alt="File Thumbnail Preview"
-                contain
-                class="pa-4"
-                height="600"
-                width="100%"
-              />
-            </v-card>
-          </v-dialog>
+          <Dialog
+            v-model:visible="dialog"
+            modal
+            dismissableMask
+            :style="{ width: '80vw' }"
+          >
+            <img
+              :src="selectedFileThumbnail"
+              alt="File Thumbnail Preview"
+              style="width: 100%; height: auto; object-fit: contain"
+              @error="(e:any)=> (e.target.src = logo)"
+            />
+          </Dialog>
         </div>
       </template>
 
@@ -42,11 +50,14 @@
         <Button
           v-if="selectedFile"
           label="Remove"
-          icon="pi pi-trash"
           severity="danger"
           class="mt-4"
           @click="rootStore.selectedFile = null"
-        />
+        >
+          <template #icon>
+            <Icon name="trash" />
+          </template>
+        </Button>
       </template>
     </Card>
   </div>
@@ -56,9 +67,14 @@
 import { defineComponent, computed, ref } from "vue";
 import { useRootStore } from "@/store/RootStore";
 import { useSystemStore } from "@/store/SystemStore";
+import Card from "primevue/card";
+import Dialog from "primevue/dialog";
+import Icon from "@/components/icons/Icon.vue";
+import logo from "@/assets/logo.png";
 
 export default defineComponent({
   name: "NewScheduleCard",
+  components: { Card, Dialog, Icon },
   setup() {
     const rootStore = useRootStore();
     const selectedFile = computed(() => rootStore.selectedFile);
@@ -77,7 +93,7 @@ export default defineComponent({
       }
       return selectedFile.value
         ? selectedFile.value.Data?.Url?.Thumbnail || ""
-        : "/assets/usercard.png";
+        : logo;
     });
 
     // Title: The file's title or BSKEY as a fallback.
@@ -117,8 +133,8 @@ export default defineComponent({
     const openDialog = () => {
       dialog.value = true;
     };
-
     return {
+      logo,
       rootStore,
       selectedFile,
       systemStore,

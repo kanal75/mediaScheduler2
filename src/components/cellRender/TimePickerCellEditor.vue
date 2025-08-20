@@ -5,7 +5,6 @@
       v-model="localRange"
       selectionMode="range"
       showTime
-      inline
       :closeOnDateSelect="false"
       class="date-picker"
       dateFormat="yy-mm-dd"
@@ -49,9 +48,11 @@
 import { defineComponent } from "vue";
 import { useDateRangePicker } from "@/components/composables/useDateRangePicker";
 import { useRootStore } from "@/store/RootStore";
+import DatePicker from "primevue/datepicker";
 
 export default defineComponent({
   name: "TimePickerCellEditor",
+  components: { DatePicker },
   props: {
     params: { type: Object, required: true },
   },
@@ -59,6 +60,13 @@ export default defineComponent({
   setup(props) {
     // Root store to persist changes
     const rootStore = useRootStore();
+    // Initialize with the current cell value if present
+    const initialRange =
+      Array.isArray(props.params.value) && props.params.value.length === 2
+        ? props.params.value.map((d: string | Date) =>
+            d instanceof Date ? d : new Date(d)
+          )
+        : undefined;
     const {
       dp,
       attempted,
@@ -72,7 +80,7 @@ export default defineComponent({
       onShow,
       onDateChange,
     } = useDateRangePicker({
-      initialRange: rootStore.newSchedule.timePicker,
+      initialRange,
       onChange: (range: string[]) => {
         rootStore.newSchedule.timePicker = range;
       },
@@ -142,7 +150,9 @@ export default defineComponent({
   align-items: center;
 }
 .date-picker {
-  min-width: 220px;
+  min-width: 900px;
+  width: 100%;
+  max-width: 100%;
 }
 .p-error {
   color: #e74c3c;
@@ -163,5 +173,13 @@ export default defineComponent({
   padding: 0.5em;
   background: rgba(255, 215, 0, 0.2);
   border-radius: 4px;
+}
+</style>
+
+<style>
+.p-datepicker {
+  min-width: 350px !important;
+  width: 350px !important;
+  max-width: 100% !important;
 }
 </style>

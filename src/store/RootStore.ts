@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import axios from "axios";
-import moment from "moment";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+dayjs.extend(customParseFormat);
 import { useNotificationStore } from "./NotificationStore";
 import type {
   Group,
@@ -18,34 +20,7 @@ const baseURL = isProd
   ? window.location.origin + "/ROOT/"
   : "http://127.0.0.1/ROOT/";
 
-// Recursively transforms a folder object into a TreeNode.
-function transformFolder(folder: any): TreeNode {
-  const node: TreeNode = {
-    name: folder.Name,
-    path: folder.Path,
-    bskey: folder.BSKEY,
-    children: [],
-    files: [],
-  };
-
-  if (folder.Folder) {
-    if (Array.isArray(folder.Folder)) {
-      node.children = folder.Folder.map(transformFolder);
-    } else {
-      node.children.push(transformFolder(folder.Folder));
-    }
-  }
-
-  if (folder.File) {
-    if (Array.isArray(folder.File)) {
-      node.files = folder.File;
-    } else {
-      node.files.push(folder.File);
-    }
-  }
-
-  return node;
-}
+// Note: server returns already-shaped tree data for UI components; we keep raw structure in treeData.
 
 // ----------------------------
 // RootStore Definition
@@ -103,7 +78,7 @@ export const useRootStore = defineStore("RootStore", {
     async fetchProfiles() {
       try {
         // note: no "/Id" in the path
-        const resp = await axios.get<any[]>(
+        const resp = await axios.get<Array<{ Id: string }>>(
           `${baseURL}MEDIASCHEDULER/Profiles?type=copy`
         );
         // assume each item has an "Id" property at the top level
@@ -118,13 +93,16 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Error fetching Profiles.",
           life: 3000,
         });
-        console.error("Error fetching Profiles:", err);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("Error fetching Profiles:", err);
+        }
       }
     },
     async fetchScheduleTypes() {
       try {
         // note: no "/Id" in the path
-        const resp = await axios.get<any[]>(
+        const resp = await axios.get<Array<{ Id: string }>>(
           `${baseURL}MEDIASCHEDULER/ScheduleTypes?type=copy`
         );
         // assume each item has an "Id" property at the top level
@@ -139,7 +117,10 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Error fetching Schedule Types.",
           life: 3000,
         });
-        console.error("Error fetching ScheduleTypes:", err);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("Error fetching ScheduleTypes:", err);
+        }
       }
     },
 
@@ -159,7 +140,10 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Error fetching schedules.",
           life: 3000,
         });
-        console.error("Error fetching schedules:", error);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("Error fetching schedules:", error);
+        }
       } finally {
         this.isScheduleLoading = false;
       }
@@ -198,10 +182,10 @@ export const useRootStore = defineStore("RootStore", {
         let status = "Unscheduled";
         if (Array.isArray(timePicker) && timePicker.length === 2) {
           const [startStr, endStr] = timePicker;
-          const start = moment(startStr, "YYYY-MM-DD HH:mm");
-          const end = moment(endStr, "YYYY-MM-DD HH:mm");
+          const start = dayjs(startStr, "YYYY-MM-DD HH:mm", true);
+          const end = dayjs(endStr, "YYYY-MM-DD HH:mm", true);
           if (start.isValid() && end.isValid()) {
-            const now = moment();
+            const now = dayjs();
             if (now.isAfter(end)) {
               status = "Passed";
             } else if (now.isBefore(start)) {
@@ -220,8 +204,8 @@ export const useRootStore = defineStore("RootStore", {
 
       this.schedules = tempArray.sort(
         (a, b) =>
-          moment(b.bonsaiXmlDB.addTimestamp).valueOf() -
-          moment(a.bonsaiXmlDB.addTimestamp).valueOf()
+          dayjs(b.bonsaiXmlDB.addTimestamp).valueOf() -
+          dayjs(a.bonsaiXmlDB.addTimestamp).valueOf()
       );
     },
 
@@ -242,15 +226,19 @@ export const useRootStore = defineStore("RootStore", {
           life: 3000,
         });
         // Enhanced error logging
-        if (axios.isAxiosError && axios.isAxiosError(error)) {
-          console.error(
-            "Error fetching schedule tags groups:",
-            error.message,
-            error.response?.data,
-            error.config
-          );
-        } else {
-          console.error("Error fetching schedule tags groups:", error);
+        if (process.env.NODE_ENV !== "production") {
+          if (axios.isAxiosError && axios.isAxiosError(error)) {
+            // eslint-disable-next-line no-console
+            console.error(
+              "Error fetching schedule tags groups:",
+              error.message,
+              error.response?.data,
+              error.config
+            );
+          } else {
+            // eslint-disable-next-line no-console
+            console.error("Error fetching schedule tags groups:", error);
+          }
         }
       } finally {
         this.isTagsLoading = false;
@@ -283,7 +271,10 @@ export const useRootStore = defineStore("RootStore", {
       });
 
       // Debug: log normalized groups
-      console.log("Normalized groups:", JSON.parse(JSON.stringify(groups)));
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("Normalized groups:", JSON.parse(JSON.stringify(groups)));
+      }
 
       // Replace the array to ensure reactivity
       this.scheduleTagsGroups = [...groups].sort((a, b) => {
@@ -346,7 +337,10 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Error fetching tree data.",
           life: 3000,
         });
-        console.error("Error fetching tree data:", error);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("Error fetching tree data:", error);
+        }
       }
     },
 
@@ -383,7 +377,10 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Error saving schedule.",
           life: 3000,
         });
-        console.error("Error saving NewSchedule:", error);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("Error saving NewSchedule:", error);
+        }
         throw error;
       }
     },
@@ -437,7 +434,10 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Error deleting schedule.",
           life: 3000,
         });
-        console.error("DELETE ERROR:", error);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("DELETE ERROR:", error);
+        }
         throw error;
       }
     },
@@ -509,7 +509,10 @@ export const useRootStore = defineStore("RootStore", {
         } else {
           group.Tag = [tag];
         }
-        console.log("Tag upserted:", tag);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("Tag upserted:", tag);
+        }
         await this.fetchScheduleTagsGroups();
         const notificationStore = useNotificationStore();
         notificationStore.showToast({

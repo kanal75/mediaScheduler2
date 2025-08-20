@@ -12,7 +12,7 @@
       class="time-separator"
       style="margin-right: 8px; display: inline"
     >
-      <i class="pi pi-arrow-right"></i>
+      <Icon name="arrow-right" />
     </span>
     <Tag
       v-if="dateArray.length > 1"
@@ -25,10 +25,13 @@
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
+import Icon from "@/components/icons/Icon.vue";
 import dayjs from "dayjs";
+import Tag from "primevue/tag";
 
 export default defineComponent({
   name: "TimePickerCellRenderer",
+  components: { Tag, Icon },
   props: {
     params: { type: Object, required: true },
   },

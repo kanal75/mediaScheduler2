@@ -13,7 +13,7 @@
       >
         <div style="flex: 1 1 0; min-width: 0">
           <Calendar
-            v-model="system.date"
+            v-model="calendarDate"
             dateFormat="yy-mm-dd"
             :manualInput="false"
             placeholder="Select Date"
@@ -94,7 +94,7 @@
               <span class="checkbox-label">{{ option.label }}</span>
             </div>
           </div>
-          <v-spacer></v-spacer>
+          <span style="flex: 1 1 auto"></span>
           <div class="leg-input">
             <template v-if="leg.isAllChecked">
               <span>{{
@@ -114,26 +114,23 @@
       </div>
       <div class="p-grid system-form-actions" style="margin-top: 1.5rem">
         <div class="left-actions">
-          <Button
-            label="Cancel"
-            icon="pi pi-times"
-            class="p-button-info"
-            @click="onCancel"
-          />
-          <Button
-            label="Reset"
-            icon="pi pi-refresh"
-            class="p-button-secondary"
-            @click="resetForm"
-          />
+          <Button label="Cancel" class="p-button-info" @click="onCancel">
+            <template #icon>
+              <Icon name="times" />
+            </template>
+          </Button>
+          <Button label="Reset" class="p-button-secondary" @click="resetForm">
+            <template #icon>
+              <Icon name="refresh" />
+            </template>
+          </Button>
         </div>
         <div class="right-actions">
-          <Button
-            label="Add System"
-            icon="pi pi-plus"
-            @click="onSubmit"
-            class="p-mr-2"
-          />
+          <Button label="Add System" @click="onSubmit" class="p-mr-2">
+            <template #icon>
+              <Icon name="plus" />
+            </template>
+          </Button>
         </div>
       </div>
     </Form>
@@ -141,23 +138,42 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref } from "vue";
+import { defineComponent, computed, ref, watch } from "vue";
 import { useSystemStore } from "@/store/SystemStore";
 import { useRootStore } from "@/store/RootStore";
 import { useRefStore } from "@/store/RefStore";
-import { useToast } from "primevue/usetoast";
 import type { Leg } from "../../types";
 import dayjs from "dayjs";
-import moment from "moment";
+import Form from "@primevue/forms/form";
+import Calendar from "primevue/calendar";
+import Select from "primevue/select";
+import InputText from "primevue/inputtext";
+import Divider from "primevue/divider";
+import Checkbox from "primevue/checkbox";
+import Button from "primevue/button";
+import Icon from "@/components/icons/Icon.vue";
 
 export default defineComponent({
   name: "SystemForm",
+  components: {
+    Form,
+    Calendar,
+    Select,
+    InputText,
+    Divider,
+    Checkbox,
+    Button,
+    Icon,
+  },
   setup() {
     const systemStore = useSystemStore();
     const rootStore = useRootStore();
     const refStore = useRefStore();
-    const toast = useToast();
     const system = systemStore.system;
+    // PrimeVue Calendar expects a Date; keep a local Date ref and sync to store's YYYY-MM-DD string
+    const calendarDate = ref<Date | null>(
+      system.date ? dayjs(system.date).toDate() : null
+    );
     const dayTracks = computed(() =>
       systemStore.dayTracks.map((t) => ({ label: t, value: t }))
     );
@@ -217,7 +233,7 @@ export default defineComponent({
       const date = system.date;
       const track = system.track;
       const betType = system.betType;
-      const timeStr = moment().format("HHmmss");
+      const timeStr = dayjs().format("HHmmss");
       const fileName = `${profile}_System_${date}_${track}_${betType}_${timeStr}.png`;
       const path = `http://10.200.35.111/data/Storage/Production/Media_Scheduler/${profile}/${scheduleTypes}/${fileName}`;
       const location = `\\onair.vast.k75-core.local\\data\\Storage\\Production\\Media_Scheduler\\${profile}\\${scheduleTypes}\\${fileName}`;
@@ -259,13 +275,22 @@ export default defineComponent({
     }
 
     function onDateChange(date: Date) {
-      // Format to yyyy-MM-dd for backend
+      // Keep local Date in sync and format to yyyy-MM-dd for backend
+      calendarDate.value = date;
       system.date = dayjs(date).format("YYYY-MM-DD");
       getDayTracks();
     }
 
+    // Also watch manual clears (if any) to keep system.date consistent
+    watch(calendarDate, (val) => {
+      if (!val) {
+        system.date = "";
+      }
+    });
+
     return {
       system,
+      calendarDate,
       rules,
       dayTracks,
       trackBetTypes,

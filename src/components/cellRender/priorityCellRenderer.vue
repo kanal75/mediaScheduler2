@@ -1,21 +1,21 @@
 <template>
-  <v-rating
-    half-increments
-    hover
-    :length="5"
-    :size="20"
-    :model-value="rating"
-    active-color="primary"
-    :readonly="isGroup"
-    @update:model-value="updateRating"
-  />
+  <div class="priority-cell">
+    <Rating
+      :modelValue="rating"
+      :readonly="isGroup"
+      :cancel="false"
+      @update:modelValue="updateRating"
+    />
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed } from "vue";
+import Rating from "primevue/rating";
 
 export default defineComponent({
   name: "priorityCellRenderer",
+  components: { Rating },
   props: {
     params: {
       type: Object,
@@ -65,3 +65,17 @@ export default defineComponent({
   },
 });
 </script>
+
+<style>
+.priority-cell {
+  display: flex !important;
+  align-items: center; /* vertical center inside AG Grid row height */
+  justify-content: center; /* horizontal center */
+  height: 100%;
+  width: 100%;
+}
+/* Ensure PrimeVue rating doesn't introduce extra vertical spacing */
+:deep(.p-rating) {
+  line-height: 1;
+}
+</style>

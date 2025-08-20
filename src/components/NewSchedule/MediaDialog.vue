@@ -4,7 +4,7 @@
       v-model:visible="refStore.showMediaDialog"
       header="Add New Schedule"
       :style="{ width: '80vw' }"
-      contentStyle="max-height: 80vh; overflow-y: auto;"
+      contentStyle="height: 80vh; overflow: hidden;"
       :baseZIndex="10000"
       :closeOnEscape="true"
       :dismissableMask="true"
@@ -12,18 +12,17 @@
       maximizable
       @update:visible="onDialogVisibleChange"
     >
-      <Splitter style="height: 100%; padding: 2%" :gutterSize="5">
+      <Splitter style="height: 100%" :gutterSize="5">
         <!-- Left Panel: Tree (MediaTree) -->
-        <SplitterPanel class="flex items-center justify-center" :size="30">
+        <SplitterPanel
+          class="flex items-center justify-center h-full"
+          :size="30"
+        >
           <MediaTree />
         </SplitterPanel>
         <!-- Middle Panel: Gallery (MediaGallery) -->
-        <SplitterPanel class="p-0" :size="50">
+        <SplitterPanel class="p-0 h-full" :size="70">
           <MediaGallery />
-        </SplitterPanel>
-        <!-- Right Panel: Advanced Schedule Card (NewScheduleCard) -->
-        <SplitterPanel class="p-0" :size="20">
-          <NewScheduleCard />
         </SplitterPanel>
       </Splitter>
 
@@ -31,34 +30,35 @@
       <template #footer>
         <div class="flex items-center w-full">
           <div class="flex gap-2">
-            <Button
-              label="Cancel"
-              icon="pi pi-times"
-              class="p-button-info"
-              @click="closeDialog"
-            />
+            <Button label="Cancel" class="p-button-info" @click="closeDialog">
+              <template #icon>
+                <Icon name="times" />
+              </template>
+            </Button>
             <Button
               label="Reset"
-              icon="pi pi-refresh"
               class="p-button-secondary"
               @click="resetMedia"
-            />
+            >
+              <template #icon>
+                <Icon name="refresh" />
+              </template>
+            </Button>
             <Button
               label="Refresh Tree"
-              icon="pi pi-sync"
               class="p-button-warning"
               @click="refreshTree"
-            />
+            >
+              <template #icon>
+                <Icon name="sync" />
+              </template>
+            </Button>
           </div>
           <div class="flex-1"></div>
           <div class="flex justify-end">
-            <Button
-              label="Add Media"
-              icon="pi pi-plus"
-              :disabled="!isFileSelected"
-              @click="addToMetaData"
-              class="p-button-primary"
-            />
+            <span class="add-media-instruction"
+              >Click an image to add media</span
+            >
           </div>
         </div>
       </template>
@@ -67,19 +67,27 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, watch } from "vue";
 import { useRefStore } from "@/store/RefStore";
 import { useRootStore } from "@/store/RootStore";
 import MediaTree from "@/components/NewSchedule/MediaTree.vue";
 import MediaGallery from "@/components/NewSchedule/MediaGallery.vue";
-import NewScheduleCard from "@/components/NewSchedule/NewScheduleCard.vue";
+import Dialog from "primevue/dialog";
+import Splitter from "primevue/splitter";
+import SplitterPanel from "primevue/splitterpanel";
+import Button from "primevue/button";
+import Icon from "@/components/icons/Icon.vue";
 
 export default defineComponent({
   name: "MediaDialog",
   components: {
     MediaTree,
     MediaGallery,
-    NewScheduleCard,
+    Dialog,
+    Splitter,
+    SplitterPanel,
+    Button,
+    Icon,
   },
   setup() {
     const refStore = useRefStore();
@@ -121,6 +129,49 @@ export default defineComponent({
       }
     };
 
+    // Ensure a default folder with files is selected when dialog opens
+    function findFirstFolderWithFiles(node: unknown): unknown | null {
+      if (!node) return null;
+      const nodes = Array.isArray(node) ? node : [node];
+      for (const n of nodes) {
+        const folders = n.Folder
+          ? Array.isArray(n.Folder)
+            ? n.Folder
+            : [n.Folder]
+          : [];
+        // Prefer a folder that already has files
+        for (const f of folders) {
+          const files = f.File
+            ? Array.isArray(f.File)
+              ? f.File
+              : [f.File]
+            : [];
+          if (files.length > 0) return f;
+        }
+        // Otherwise, recurse deeper
+        for (const f of folders) {
+          const found = findFirstFolderWithFiles(f);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    watch(
+      () => refStore.showMediaDialog,
+      async (open) => {
+        if (open) {
+          if (!rootStore.treeData) {
+            await rootStore.fetchTreeData();
+          }
+          if (!rootStore.selectedFolder && rootStore.treeData) {
+            const first = findFirstFolderWithFiles(rootStore.treeData);
+            if (first) rootStore.setSelectedFolder(first);
+          }
+        }
+      }
+    );
+
     return {
       refStore,
       rootStore,
@@ -143,7 +194,13 @@ export default defineComponent({
 .w-full {
   width: 100%;
 }
-.add-media-absolute {
-  /* Remove absolute positioning */
+.add-media-instruction {
+  color: #1976d2;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.5em 1em;
+  border-radius: 4px;
+  background: rgba(25, 118, 210, 0.08);
 }
 </style>

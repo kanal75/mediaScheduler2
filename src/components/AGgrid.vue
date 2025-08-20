@@ -22,10 +22,41 @@
 <script lang="ts">
 import { defineComponent, ref, watch, toRaw, computed } from "vue";
 import { AgGridVue } from "ag-grid-vue3";
-import * as agGridCommunity from "ag-grid-community";
-import * as agGridEnterprise from "ag-grid-enterprise";
-import { StatusPanelDef } from "ag-grid-community";
-import { StatusBarModule } from "ag-grid-enterprise";
+import {
+  ModuleRegistry,
+  ClientSideRowModelModule,
+  RowSelectionModule,
+  PaginationModule,
+  themeQuartz,
+  colorSchemeDark,
+  colorSchemeLight,
+  TextFilterModule,
+  NumberFilterModule,
+  DateFilterModule,
+  type GridApi,
+  type GridOptions,
+  type GridState,
+  type StatusPanelDef,
+  type GetContextMenuItemsParams,
+  type MenuItemDef,
+  type ValueGetterParams,
+  type ValueFormatterParams,
+  type ValueSetterParams,
+  type ITooltipParams,
+  type GridReadyEvent,
+  type FilterModel,
+} from "ag-grid-community";
+import {
+  RowGroupingModule,
+  RowGroupingPanelModule,
+  MenuModule,
+  ColumnsToolPanelModule,
+  FiltersToolPanelModule,
+  SideBarModule,
+  StatusBarModule,
+  SetFilterModule,
+  AllEnterpriseModule,
+} from "ag-grid-enterprise";
 import CustomLoadingOverlay from "@/components/CustomLoadingOverlay.vue";
 import StatusCellRender from "@/components/cellRender/StatusCellRender.vue";
 import priorityCellRenderer from "@/components/cellRender/priorityCellRenderer.vue";
@@ -39,6 +70,7 @@ import SpecificTimesCellRender from "@/components/cellRender/SpecificTimesCellRe
 import SpecificTimesCellEditor from "@/components/cellRender/SpecificTimesCellEditor.vue";
 import DurationCellEditor from "@/components/cellRender/DurationCellEditor.vue";
 import DurationCellRender from "@/components/cellRender/DurationCellRender.vue";
+import type { Item } from "@/types";
 
 // Stores
 import { useRootStore } from "@/store/RootStore";
@@ -49,10 +81,25 @@ import { useNotificationStore } from "@/store/NotificationStore";
 import SaveLayoutDialog from "@/components/SaveLayoutDialog.vue";
 import { Layout } from "@/types";
 
-// Register enterprise modules.
-agGridEnterprise.ModuleRegistry.registerModules([
-  agGridEnterprise.AllEnterpriseModule,
+// Register AG Grid community and enterprise modules.
+ModuleRegistry.registerModules([
+  // Community
+  ClientSideRowModelModule,
+  RowSelectionModule,
+  PaginationModule,
+  TextFilterModule,
+  NumberFilterModule,
+  DateFilterModule,
+  // Enterprise
+  RowGroupingModule,
+  RowGroupingPanelModule,
+  MenuModule,
+  ColumnsToolPanelModule,
+  FiltersToolPanelModule,
+  SideBarModule,
   StatusBarModule,
+  SetFilterModule,
+  AllEnterpriseModule,
 ]);
 
 export default defineComponent({
@@ -75,11 +122,19 @@ export default defineComponent({
     };
 
     // Reference to the grid API.
-    const gridApi = ref<any>(null);
+    const gridApi = ref<GridApi | null>(null);
     // Local state for capturing grid state.
-    const state = ref<any>(null);
+    type FullGridState = GridState & { filterModel?: FilterModel };
+    const state = ref<FullGridState | null>(null);
     // Ref for initializing grid state when loading a saved layout.
-    const initialState = ref(undefined);
+    const initialState = ref<FullGridState | undefined>(undefined);
+    // Lightweight types for metaData to avoid any
+    type MetaDataLite = {
+      duration?: unknown;
+      MediaInfo?: { Durations?: Array<{ TimeCode?: string }> };
+      [key: string]: unknown;
+    };
+    type ItemWithMeta = Item & { metaData?: MetaDataLite };
 
     // Ref to skip next layout apply after update
     const skipNextLayoutApply = ref(false);
@@ -88,12 +143,8 @@ export default defineComponent({
     const isLayoutApplying = ref(false);
 
     // Define themes.
-    const darkTheme = agGridCommunity.themeQuartz.withPart(
-      agGridCommunity.colorSchemeDark
-    );
-    const lightTheme = agGridCommunity.themeQuartz.withPart(
-      agGridCommunity.colorSchemeLight
-    );
+    const darkTheme = themeQuartz.withPart(colorSchemeDark);
+    const lightTheme = themeQuartz.withPart(colorSchemeLight);
 
     const statusBar = ref<{ statusPanels: StatusPanelDef[] }>({
       statusPanels: [
@@ -118,7 +169,7 @@ export default defineComponent({
 
     // Save and restore full grid state (columns, filters, sort, etc.)
     // Use AG Grid's getState and apply state best practices
-    function getFullGridState() {
+    function getFullGridState(): FullGridState | null {
       if (!gridApi.value || gridApi.value.isDestroyed?.()) return null;
       // AG Grid 31+ getState returns full state (columns, filters, sort, group, pin, etc.)
       // But for filters, explicitly include filterModel for reliability
@@ -129,17 +180,19 @@ export default defineComponent({
           : undefined,
       };
     }
-    function setFullGridState(state: any) {
+    function setFullGridState(state: FullGridState) {
       if (!gridApi.value || !state) return;
       isLayoutApplying.value = true;
-      if (gridApi.value.setState) {
-        gridApi.value.setState(state);
-      }
+      // setState is available in newer AG Grid versions; call it if present.
+      const apiWithState = gridApi.value as unknown as {
+        setState?: (s: unknown) => void;
+      };
+      apiWithState.setState?.(state as unknown);
       // Delay filter application to ensure grid is ready
       if (state.filterModel && gridApi.value && gridApi.value.setFilterModel) {
         setTimeout(() => {
           if (gridApi.value) {
-            gridApi.value.setFilterModel(state.filterModel);
+            gridApi.value.setFilterModel(state.filterModel as FilterModel);
             if (gridApi.value.onFilterChanged) {
               gridApi.value.onFilterChanged();
             }
@@ -161,12 +214,12 @@ export default defineComponent({
     }
 
     // Grid options.
-    const gridOptions = ref<agGridCommunity.GridOptions>({
+    const gridOptions = ref<GridOptions>({
       theme: refStore.isDarkMode ? darkTheme : lightTheme,
       rowSelection: {
         mode: "multiRow",
         enableClickSelection: true,
-        checkboxes: true,
+        // checkboxes provided by explicit column below
       },
       animateRows: true,
       pagination: accountStore.account?.settings.general.pagination || false,
@@ -190,7 +243,8 @@ export default defineComponent({
           field: "status",
           headerName: "Status",
           cellRenderer: StatusCellRender,
-          valueGetter: (params) => params.data?.status, // Ensure grouping uses computed status
+          valueGetter: (params: ValueGetterParams) =>
+            (params.data as Item)?.status, // Ensure grouping uses computed status
           maxWidth: 150,
           enableRowGroup: true,
         },
@@ -198,8 +252,9 @@ export default defineComponent({
           field: "priority",
           maxWidth: 200,
           cellRenderer: priorityCellRenderer,
+          cellClass: "priority-cell-col",
           editable: () => isLoggedIn.value,
-          valueSetter: (params) => {
+          valueSetter: (params: ValueSetterParams) => {
             params.data.priority = params.newValue;
             rootStore.upsertSchedule(params.data);
             return true;
@@ -214,6 +269,8 @@ export default defineComponent({
           editable: () => isLoggedIn.value,
           cellEditorPopup: true,
           cellEditorPopupPosition: "under",
+          minWidth: 350,
+          maxWidth: 350,
         },
         {
           field: "specificTimes",
@@ -223,7 +280,12 @@ export default defineComponent({
           editable: () => isLoggedIn.value,
           cellEditorPopup: true,
           cellEditorPopupPosition: "under",
-          maxWidth: 200,
+          maxWidth: 450,
+          cellStyle: {
+            alignItems: "flex-start",
+            justifyContent: "flex-start",
+            textAlign: "left",
+          },
         },
         {
           field: "File Information",
@@ -233,33 +295,33 @@ export default defineComponent({
               field: "metaData.FileInfo.Created",
               headerName: "Created",
               hide: true,
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
             {
               field: "metaData.FileInfo.Size",
               headerName: "Size",
               hide: true,
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
             {
               field: "metaData.FileInfo.Owner",
               headerName: "Owner",
               hide: true,
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
           ],
@@ -271,39 +333,39 @@ export default defineComponent({
               field: "metaData.General.Name",
               headerName: "Name",
               hide: true,
-              tooltipValueGetter: (params) =>
+              tooltipValueGetter: (params: ITooltipParams) =>
                 params.data?.metaData?.General?.Name || "",
               headerTooltip: "Name",
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
             {
               field: "metaData.General.Extension",
               headerName: "Extension",
               hide: true,
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
             {
               field: "metaData.General.FullName",
               headerName: "Full Name",
-              tooltipValueGetter: (params) =>
+              tooltipValueGetter: (params: ITooltipParams) =>
                 params.data?.metaData?.General?.FullName || "",
               headerTooltip: "Full Name",
               hide: true,
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
           ],
@@ -319,30 +381,30 @@ export default defineComponent({
                   field: "metaData.MediaInfo.Size.Height",
                   headerName: "Height",
                   hide: true,
-                  valueFormatter: (params) => {
+                  valueFormatter: (params: ValueFormatterParams) => {
                     if (params.value == null) return "";
                     if (typeof params.value === "object")
                       return JSON.stringify(params.value);
-                    return params.value;
+                    return params.value as string;
                   },
                 },
                 {
                   field: "metaData.MediaInfo.Size.Width",
                   headerName: "Width",
                   hide: true,
-                  valueFormatter: (params) => {
+                  valueFormatter: (params: ValueFormatterParams) => {
                     if (params.value == null) return "";
                     if (typeof params.value === "object")
                       return JSON.stringify(params.value);
-                    return params.value;
+                    return params.value as string;
                   },
                 },
               ],
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
           ],
@@ -353,57 +415,57 @@ export default defineComponent({
             {
               field: "metaData.Url.Download",
               headerName: "Download",
-              tooltipValueGetter: (params) =>
+              tooltipValueGetter: (params: ITooltipParams) =>
                 params.data?.metaData?.Url?.Download || "",
               headerTooltip: "Download",
               hide: true,
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
             {
               field: "metaData.Url.Play",
               headerName: "Play",
-              tooltipValueGetter: (params) =>
+              tooltipValueGetter: (params: ITooltipParams) =>
                 params.data?.metaData?.Url?.Play || "",
               headerTooltip: "Play",
               hide: true,
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
             {
               field: "metaData.Url.Root",
               headerName: "Root",
-              tooltipValueGetter: (params) =>
+              tooltipValueGetter: (params: ITooltipParams) =>
                 params.data?.metaData?.Url?.Root || "",
               headerTooltip: "Root",
               hide: true,
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
             {
               field: "metaData.Url.Thumbnail",
               headerName: "Thumbnail",
-              tooltipValueGetter: (params) =>
+              tooltipValueGetter: (params: ITooltipParams) =>
                 params.data?.metaData?.Url?.Thumbnail || "",
               headerTooltip: "Thumbnail",
               hide: true,
-              valueFormatter: (params) => {
+              valueFormatter: (params: ValueFormatterParams) => {
                 if (params.value == null) return "";
                 if (typeof params.value === "object")
                   return JSON.stringify(params.value);
-                return params.value;
+                return params.value as string;
               },
             },
           ],
@@ -415,7 +477,7 @@ export default defineComponent({
           cellEditor: TagsCellEditor,
           minWidth: 400,
           editable: () => isLoggedIn.value,
-          valueSetter: (params) => {
+          valueSetter: (params: ValueSetterParams) => {
             params.data.scheduleTags = params.newValue;
             rootStore.updateScheduleTags(params.data.id, params.newValue);
             return true;
@@ -433,9 +495,10 @@ export default defineComponent({
           cellRenderer: DurationCellRender,
           cellEditor: DurationCellEditor,
           minWidth: 180,
-          editable: (params) => {
+          // Allow edit only when logged in, and not when MediaInfo has a timecode-derived duration
+          editable: (params: { data?: ItemWithMeta }) => {
             if (!isLoggedIn.value) return false;
-            const metaData = params.data?.metaData || {};
+            const metaData: MetaDataLite = params.data?.metaData ?? {};
             // If MediaInfo.Durations[0].TimeCode exists and no metaData.duration, duration is read-only
             if (
               metaData.MediaInfo &&
@@ -447,10 +510,11 @@ export default defineComponent({
             }
             return true;
           },
-          valueFormatter: (params) =>
-            typeof params.value === "object"
+          valueFormatter: (params: ValueFormatterParams) => {
+            return typeof params.value === "object"
               ? JSON.stringify(params.value)
-              : params.value,
+              : (params.value as string);
+          },
         },
         {
           field: "actions",
@@ -490,7 +554,7 @@ export default defineComponent({
         DurationCellEditor,
         DurationCellRender,
       },
-      onGridReady(params) {
+      onGridReady(params: GridReadyEvent) {
         gridApi.value = params.api;
         // Clean up gridApi reference when grid is destroyed
         params.api.addEventListener("gridPreDestroyed", () => {
@@ -502,12 +566,15 @@ export default defineComponent({
         if (initialState.value) {
           isLayoutApplying.value = true;
           setTimeout(() => {
-            setFullGridState(initialState.value);
+            const init = initialState.value;
+            if (init) {
+              setFullGridState(init);
+            }
           }, 0);
         }
       },
-      getContextMenuItems(params: any) {
-        const menuItems: import("ag-grid-community").MenuItemDef[] = [];
+      getContextMenuItems(params: GetContextMenuItemsParams) {
+        const menuItems: MenuItemDef[] = [];
         // Only allow duplicate/delete if user is logged in
         if (accountStore.account) {
           // Duplicate Selected Row(s)
@@ -518,16 +585,13 @@ export default defineComponent({
                 : "Duplicate Row",
             icon: '<span class="ag-icon ag-icon-copy"></span>',
             action: async () => {
-              const selectedRows = params.api.getSelectedRows();
-              if (
-                selectedRows.length === 0 &&
-                params.node &&
-                params.node.data
-              ) {
-                selectedRows.push(params.node.data);
+              const selectedRows = [
+                ...(params.api.getSelectedRows() as Item[]),
+              ];
+              if (selectedRows.length === 0 && params.node?.data) {
+                selectedRows.push(params.node.data as Item);
               }
               if (selectedRows.length > 0) {
-                // Show a confirmation dialog before duplicateing
                 const confirmMsg =
                   selectedRows.length > 1
                     ? `Are you sure you want to duplicate ${selectedRows.length} items?`
@@ -542,18 +606,18 @@ export default defineComponent({
                         : "Duplicateing this item...",
                     life: 2000,
                   });
+                  const baseIndex = (params.node?.rowIndex ?? 0) + 1;
+                  let offset = 0;
                   for (const row of selectedRows) {
-                    const currentRowIndex =
-                      params.api.getRowNode(row.id)?.rowIndex ??
-                      params.node.rowIndex;
-                    const newSchedule = {
+                    const newSchedule: Item = {
                       ...row,
                       id: Date.now().toString() + Math.random(),
-                    };
+                    } as Item;
                     params.api.applyTransaction({
                       add: [newSchedule],
-                      addIndex: currentRowIndex + 1,
+                      addIndex: baseIndex + offset,
                     });
+                    offset += 1;
                     await rootStore.upsertSchedule(newSchedule);
                   }
                   notificationStore.showToast({
@@ -588,12 +652,33 @@ export default defineComponent({
                   : "Delete Row",
               icon: '<span style="display:inline-flex;align-items:center;"><span class="v-icon notranslate mdi mdi-delete-outline" style="font-size:16px;"></span></span>',
               action: async () => {
-                const rowsToDelete =
-                  params.api.getSelectedRows().length > 0
-                    ? params.api.getSelectedRows()
-                    : params.node && params.node.data
-                    ? [params.node.data]
-                    : [];
+                const rowsToDelete: Item[] = (() => {
+                  // Collect only selected rows that are displayed on the CURRENT PAGE
+                  const pageSelected: Item[] = [];
+                  const displayedCount = params.api.getDisplayedRowCount();
+                  for (let i = 0; i < displayedCount; i++) {
+                    const rowNode = params.api.getDisplayedRowAtIndex(i);
+                    if (!rowNode) continue;
+                    const selected =
+                      typeof rowNode.isSelected === "function"
+                        ? rowNode.isSelected()
+                        : false;
+                    if (selected && rowNode.data) {
+                      pageSelected.push(rowNode.data as Item);
+                    }
+                  }
+                  if (pageSelected.length > 0) return pageSelected;
+                  if (params.node && params.node.data) {
+                    return [params.node.data as Item];
+                  }
+                  return [] as Item[];
+                })();
+
+                // Guardrail: if more rows are selected globally than on this page, warn in the confirmation
+                const totalSelected = params.api.getSelectedNodes
+                  ? params.api.getSelectedNodes().length
+                  : params.api.getSelectedRows().length;
+
                 if (
                   rowsToDelete.length > 0 &&
                   window.confirm(
@@ -601,7 +686,10 @@ export default defineComponent({
                       rowsToDelete.length > 1
                         ? rowsToDelete.length + " items"
                         : "this item"
-                    }?`
+                    }?` +
+                      (totalSelected > rowsToDelete.length
+                        ? ` (Note: ${totalSelected} selected in total; only ${rowsToDelete.length} on this page will be deleted)`
+                        : "")
                   )
                 ) {
                   notificationStore.showToast({
@@ -614,11 +702,10 @@ export default defineComponent({
                     }...`,
                     life: 2000,
                   });
-                  // Sequentially delete each row to avoid overloading the server
                   for (const row of rowsToDelete) {
                     try {
-                      await rootStore.deleteSchedule(row); // Wait for each delete to finish
-                      params.api.applyTransaction({ remove: [row] }); // Remove from grid only after successful delete
+                      await rootStore.deleteSchedule(row);
+                      params.api.applyTransaction({ remove: [row] });
                     } catch (e) {
                       notificationStore.showToast({
                         severity: "error",
@@ -639,7 +726,7 @@ export default defineComponent({
                   });
                 }
               },
-            } as import("ag-grid-community").MenuItemDef);
+            } as MenuItemDef);
           }
         }
         return menuItems;
@@ -668,6 +755,26 @@ export default defineComponent({
         captureGridState();
         updateCurrentLayout();
       },
+      onColumnVisible() {
+        captureGridState();
+        updateCurrentLayout();
+      },
+      onDisplayedColumnsChanged() {
+        captureGridState();
+        updateCurrentLayout();
+      },
+      onColumnPinned() {
+        captureGridState();
+        updateCurrentLayout();
+      },
+      onColumnPivotChanged() {
+        captureGridState();
+        updateCurrentLayout();
+      },
+      onColumnPivotModeChanged() {
+        captureGridState();
+        updateCurrentLayout();
+      },
     });
 
     // Track desired sidebar state in case gridApi is not ready
@@ -687,7 +794,7 @@ export default defineComponent({
     // Deep watch for account changes.
     watch(
       () => accountStore.account,
-      (account, _prev, onCleanup) => {
+      (account) => {
         if (skipNextLayoutApply.value) {
           skipNextLayoutApply.value = false;
           return;
@@ -695,22 +802,27 @@ export default defineComponent({
         if (account) {
           const defaultLayout = account.layouts?.find((l) => l.isDefault);
           if (defaultLayout && defaultLayout.state) {
-            if (gridApi.value && typeof gridApi.value.setState === "function") {
-              gridApi.value.setState(defaultLayout.state);
-              // After login/refresh, apply layout again to ensure all state (like filters) is applied
+            if (gridApi.value) {
+              const apiWithState = gridApi.value as unknown as {
+                setState?: (s: unknown) => void;
+              };
+              apiWithState.setState?.(defaultLayout.state as unknown);
               setTimeout(async () => {
-                await setFullGridState(defaultLayout.state);
+                await setFullGridState(defaultLayout.state as FullGridState);
               }, 0);
             } else {
-              initialState.value = defaultLayout.state;
+              initialState.value = defaultLayout.state as FullGridState;
               gridKey.value++;
             }
           } else {
             initialState.value = undefined;
             gridKey.value++;
-            console.log(
-              "No default layout found; reverting to original layout"
-            );
+            if (process.env.NODE_ENV !== "production") {
+              // eslint-disable-next-line no-console
+              console.log(
+                "No default layout found; reverting to original layout"
+              );
+            }
           }
         } else {
           initialState.value = undefined;
@@ -769,9 +881,12 @@ export default defineComponent({
             initialState.value = defaultLayout.state;
             gridKey.value++;
             hasAppliedDefaultLayout.value = true;
-            console.log(
-              "[AGgrid] Programmatically selected and applied default layout"
-            );
+            if (process.env.NODE_ENV !== "production") {
+              // eslint-disable-next-line no-console
+              console.log(
+                "[AGgrid] Programmatically selected and applied default layout"
+              );
+            }
           }
         }
       },
@@ -817,8 +932,8 @@ export default defineComponent({
 
     // Expose onLayoutSelected so that the parent component can call it.
     const onLayoutSelected = (layout: Layout) => {
-      setFullGridState(layout.state);
-      initialState.value = layout.state;
+      setFullGridState(layout.state as FullGridState);
+      initialState.value = layout.state as FullGridState;
       gridKey.value++;
     };
     expose({ onLayoutSelected, openSaveDialog });

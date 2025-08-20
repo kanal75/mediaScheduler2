@@ -21,9 +21,11 @@
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { useRootStore } from "@/store/RootStore";
+import SelectButton from "primevue/selectbutton";
 
 export default defineComponent({
   name: "ScheduleTypeSelect",
+  components: { SelectButton },
   props: {
     attemptedSubmit: {
       type: Boolean,

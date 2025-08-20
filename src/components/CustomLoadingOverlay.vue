@@ -1,7 +1,7 @@
 <template>
   <div class="ag-overlay-loading-center" role="presentation">
     <img
-      src="/assets/ag-grid-loading-spinner.svg"
+      :src="spinner"
       alt="Loading..."
       style="height: 100px; width: 100px; display: block; margin: 0 auto"
     />
@@ -13,6 +13,7 @@
 
 <script lang="ts">
 import { defineComponent, PropType } from "vue";
+import spinner from "@/assets/ag-grid-loading-spinner.svg";
 
 export default defineComponent({
   name: "CustomLoadingOverlay",
@@ -22,6 +23,9 @@ export default defineComponent({
       required: false,
       default: () => ({ loadingMessage: "Loading..." }),
     },
+  },
+  setup() {
+    return { spinner };
   },
 });
 </script>

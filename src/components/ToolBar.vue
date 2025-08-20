@@ -1,83 +1,96 @@
 <template>
-  <v-app-bar :elevation="2">
-    <template v-slot:prepend>
-      <v-app-bar-nav-icon></v-app-bar-nav-icon>
-    </template>
-    <v-app-bar-title>Media Scheduler 2o</v-app-bar-title>
-    <v-spacer></v-spacer>
-    <v-btn
-      v-tooltip:bottom-end="'New Schedule'"
-      icon
+  <div class="toolbar p-2 surface-card shadow-2 flex align-center">
+    <div class="mr-3 font-semibold">Media Scheduler 2</div>
+    <div class="flex-1"></div>
+    <Button
+      class="p-button-rounded p-button-text"
+      v-tooltip.bottom="'New Schedule'"
+      :disabled="!accountStore.account"
       @click="showNewScheduleDialog"
-      :disabled="!accountStore.account"
+      aria-label="New Schedule"
     >
-      <v-icon>mdi-calendar-plus</v-icon>
-    </v-btn>
-    <v-btn
-      v-tooltip:bottom-end="'Settings'"
-      icon
+      <template #icon>
+        <Icon name="plus" />
+      </template>
+    </Button>
+    <Button
+      class="p-button-rounded p-button-text ml-2"
+      v-tooltip.bottom="'Settings'"
+      :disabled="!accountStore.account"
       @click="refStore.toggleSettingsPanel"
-      :disabled="!accountStore.account"
+      aria-label="Settings"
     >
-      <v-icon>mdi-cog</v-icon>
-    </v-btn>
-    <!-- Layouts button -->
-    <v-btn
-      v-tooltip:bottom="'Layouts'"
-      icon
+      <template #icon>
+        <Icon name="cog" />
+      </template>
+    </Button>
+    <Button
+      class="p-button-rounded p-button-text ml-2"
+      v-tooltip.bottom="'Layouts'"
+      :disabled="!accountStore.account"
       @click="refStore.toggleLayoutPanel"
-      :disabled="!accountStore.account"
+      aria-label="Layouts"
     >
-      <v-icon>mdi-view-quilt</v-icon>
-    </v-btn>
-    <!-- Theme toggle button -->
-    <v-btn v-tooltip:bottom="'Theme'" icon @click="toggleTheme">
-      <v-icon
-        :icon="refStore.isDarkMode ? 'mdi-weather-night' : 'mdi-weather-sunny'"
-      ></v-icon>
-    </v-btn>
-    <!-- Profile button -->
-    <v-btn
-      v-tooltip:bottom="'Profile'"
-      icon
+      <template #icon>
+        <Icon name="grid" />
+      </template>
+    </Button>
+    <Button
+      class="p-button-rounded p-button-text ml-2"
+      v-tooltip.bottom="'Theme'"
+      @click="toggleTheme"
+      aria-label="Toggle Theme"
+    >
+      <template #icon>
+        <Icon :name="refStore.isDarkMode ? 'moon' : 'sun'" />
+      </template>
+    </Button>
+    <Button
+      class="p-button-rounded p-button-text ml-2"
+      v-tooltip.bottom="'Profile'"
       @click="refStore.toggleAccountPanel"
+      aria-label="Profile"
     >
-      <template v-if="account">
-        <v-avatar size="32" color="green">
-          <span class="avatar-initials">{{ initials }}</span>
-        </v-avatar>
+      <template #icon>
+        <Avatar
+          v-if="account"
+          :label="initials"
+          class="bg-green-500 text-white"
+          size="small"
+          shape="circle"
+        />
+        <Icon v-else name="user" />
       </template>
-      <template v-else>
-        <v-icon>mdi-account</v-icon>
-      </template>
-    </v-btn>
-  </v-app-bar>
-  <SettingsPanel />
-  <LayoutPanel />
-  <AccountPanel />
-  <NewScheduleDialog />
+    </Button>
+  </div>
+  <SettingsPanel v-if="refStore.showSettingsPanel" />
+  <!-- LayoutPanel is lazy-loaded and rendered in DashBoard to avoid duplicate instances -->
+  <AccountPanel v-if="refStore.showAccountPanel" />
+  <NewScheduleDialog v-if="refStore.showNewScheduleDialog" />
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
-import { useTheme } from "vuetify";
+import { defineComponent, computed, defineAsyncComponent } from "vue";
+import Icon from "@/components/icons/Icon.vue";
+// PrimeVue tooltip directive is registered globally in main.ts
 import { useRefStore } from "@/store/RefStore";
 import { useRootStore } from "@/store/RootStore";
 import { useAccountStore } from "@/store/AccountStore";
-import SettingsPanel from "./SettingsPanel.vue";
-import LayoutPanel from "./LayoutPanel.vue";
-import AccountPanel from "./AccountPanel.vue";
-import NewScheduleDialog from "./NewSchedule/NewScheduleDialog.vue";
+// Lazy-load non-critical UI so they don't ship on first screen
+const SettingsPanel = defineAsyncComponent(() => import("./SettingsPanel.vue"));
+const AccountPanel = defineAsyncComponent(() => import("./AccountPanel.vue"));
+const NewScheduleDialog = defineAsyncComponent(
+  () => import("./NewSchedule/NewScheduleDialog.vue")
+);
 
 export default defineComponent({
   name: "ToolBar",
-  components: { AccountPanel, LayoutPanel, SettingsPanel, NewScheduleDialog },
+  components: { AccountPanel, SettingsPanel, NewScheduleDialog, Icon },
   setup() {
     const rootStore = useRootStore();
     const refStore = useRefStore();
     const accountStore = useAccountStore();
-    const vuetifyTheme = useTheme();
-    refStore.setThemeInstance(vuetifyTheme);
+    // PrimeVue directives registered globally in main.ts
 
     const account = computed(() => accountStore.account);
     const initials = computed(() => {
@@ -132,5 +145,10 @@ export default defineComponent({
   justify-content: center;
   width: 100%;
   height: 100%;
+}
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 </style>

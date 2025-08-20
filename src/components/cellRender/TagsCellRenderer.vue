@@ -12,9 +12,11 @@
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
+import Tag from "primevue/tag";
 
 export default defineComponent({
   name: "TagsCell",
+  components: { Tag },
   props: {
     params: { type: Object, required: true },
   },

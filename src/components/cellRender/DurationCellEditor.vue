@@ -18,6 +18,7 @@
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
 import { useRootStore } from "@/store/RootStore";
+import InputNumber from "primevue/inputnumber";
 
 function secondsToTimecode(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -42,6 +43,7 @@ function timecodeToSeconds(tc: string): number {
 
 export default defineComponent({
   name: "DurationCellEditor",
+  components: { InputNumber },
   props: {
     params: { type: Object, required: true },
   },

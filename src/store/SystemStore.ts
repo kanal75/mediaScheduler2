@@ -19,7 +19,7 @@ export const useSystemStore = defineStore("system", () => {
   const dayTracks: Ref<string[]> = ref([]);
   const trackBetTypes: Ref<TrackBetType[]> = ref([]);
   const systemModalVisible = ref(false);
-  const png = ref(null);
+  const png: Ref<Blob | null> = ref(null);
   const toast = useToast();
   const rootStore = useRootStore();
   // Define your API base URL based on the environment (same as RootStore)
@@ -50,7 +50,10 @@ export const useSystemStore = defineStore("system", () => {
       system.value.track = dayTracks.value[0] || "";
       await getTrackBetTypes();
     } catch (error) {
-      console.log(error);
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log(error);
+      }
       system.value.date = "";
       system.value.track = "";
       system.value.betType = "";
@@ -91,7 +94,10 @@ export const useSystemStore = defineStore("system", () => {
       system.value.betType = trackBetTypes.value[0]?.id || "";
       await getBetForms();
     } catch (error) {
-      console.log(error);
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log(error);
+      }
       system.value.betType = "";
       system.value.legs = [];
       trackBetTypes.value = [];
@@ -147,7 +153,10 @@ export const useSystemStore = defineStore("system", () => {
       });
       await getHorses();
     } catch (error) {
-      console.log(error);
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log(error);
+      }
       system.value.legs = [];
     }
   }
@@ -178,7 +187,7 @@ export const useSystemStore = defineStore("system", () => {
         "']/races/Race/starts/Start/startNr?type=copy";
       try {
         const res = await axios.get(baseURL + getString);
-        const starts = [];
+        const starts: HorseStart[] = [];
         const data = res.data;
         const numHorses = data.length / 3;
         for (let j = 0; j < numHorses; j++) {
@@ -195,7 +204,10 @@ export const useSystemStore = defineStore("system", () => {
         }
         system.value.legs[i].starts = starts;
       } catch (error) {
-        console.log(error);
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log(error);
+        }
         system.value.legs = [];
       }
     }
@@ -240,10 +252,13 @@ export const useSystemStore = defineStore("system", () => {
     }
   }
 
-  async function createPNG(pngData: any) {
+  async function createPNG(pngData: Record<string, unknown>) {
     const headers = { "Content-Type": "application/json;charset=utf-8" };
     try {
-      console.log("Creating PNG with data:", pngData);
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("Creating PNG with data:", pngData);
+      }
       const res = await axios.post(
         "http://10.200.35.111:3001/create-image/",
         JSON.stringify(pngData),
@@ -264,7 +279,10 @@ export const useSystemStore = defineStore("system", () => {
         });
       }
     } catch (error) {
-      console.log(error);
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log(error);
+      }
       toast.add({
         severity: "error",
         summary: "Error",
@@ -289,9 +307,13 @@ export const useSystemStore = defineStore("system", () => {
   function resetForm() {
     const defaults = getDefaultSystem();
     // Reset each property individually to preserve reactivity
-    Object.keys(defaults).forEach((key) => {
-      (system.value as any)[key] = (defaults as any)[key];
-    });
+    system.value.title = defaults.title;
+    system.value.date = defaults.date;
+    system.value.track = defaults.track;
+    system.value.betType = defaults.betType;
+    system.value.legs = [];
+    system.value.path = defaults.path;
+    system.value.location = defaults.location;
     // Reset all legs and their fields if any legs exist
     if (Array.isArray(system.value.legs)) {
       system.value.legs.forEach((leg) => {

@@ -1,11 +1,10 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
-import DashBoard from "@/views/DashBoard.vue"; // or from "@/views/Dashboard.vue"
 
 const routes: Array<RouteRecordRaw> = [
   {
     path: "/",
     name: "DashBoard",
-    component: DashBoard,
+    component: () => import("@/views/DashBoard.vue"),
   },
   // other routes...
 ];
@@ -24,7 +23,10 @@ router.beforeEach((to, from, next) => {
     accountStore.signIn(accountId);
   }
   next();
-  console.log("Navigating to:", to.name);
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("Navigating to:", to.name);
+  }
 });
 
 export default router;

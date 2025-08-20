@@ -3,60 +3,63 @@
     <!-- Only render buttons if params.data exists -->
     <template v-if="params.data">
       <!-- Delete button -->
-      <v-btn
-        variant="outlined"
-        class="action-btn delete-btn"
-        density="compact"
+      <Button
+        outlined
+        class="p-button-sm action-btn delete-btn"
         @click="onDelete"
         :disabled="!isLoggedIn"
+        severity="danger"
+        aria-label="Delete"
       >
-        <v-icon class="icon">mdi-delete-outline</v-icon>
-      </v-btn>
+        <Icon name="trash" class="icon" />
+      </Button>
 
       <!-- Copy button -->
-      <v-btn
-        variant="outlined"
-        class="action-btn copy-btn"
-        density="compact"
+      <Button
+        outlined
+        class="p-button-sm action-btn copy-btn"
         @click="onCopy"
         :disabled="!isLoggedIn"
+        aria-label="Copy"
       >
-        <v-icon class="icon">mdi-content-copy</v-icon>
-      </v-btn>
+        <Icon name="copy" class="icon" />
+      </Button>
 
       <!-- Pause/Play button -->
-      <v-btn
-        variant="outlined"
-        class="action-btn play-btn"
-        density="compact"
+      <Button
+        outlined
+        class="p-button-sm action-btn play-btn"
         v-if="params.data.status === 'Paused'"
         @click="onResume"
         :disabled="!isLoggedIn"
+        aria-label="Resume"
       >
-        <v-icon class="icon">mdi-play</v-icon>
-      </v-btn>
-      <v-btn
-        variant="outlined"
-        class="action-btn pause-btn"
-        density="compact"
+        <Icon name="play" class="icon" />
+      </Button>
+      <Button
+        outlined
+        class="p-button-sm action-btn pause-btn"
         v-else
         @click="onPause"
         :disabled="!isLoggedIn"
+        aria-label="Pause"
       >
-        <v-icon class="icon">mdi-pause</v-icon>
-      </v-btn>
+        <Icon name="pause" class="icon" />
+      </Button>
     </template>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, computed } from "vue";
+import Icon from "@/components/icons/Icon.vue";
 import { useRootStore } from "@/store/RootStore";
 import { useNotificationStore } from "@/store/NotificationStore";
 import { useAccountStore } from "@/store/AccountStore";
 
 export default defineComponent({
   name: "ActionsCellRenderer",
+  components: { Icon },
   props: {
     params: { type: Object, required: true },
   },
@@ -64,9 +67,6 @@ export default defineComponent({
     const rootStore = useRootStore();
     const accountStore = useAccountStore();
     const notificationStore = useNotificationStore();
-
-    // State to track whether this row is currently in edit mode
-    const editing = ref(false);
 
     const isLoggedIn = computed(() => !!accountStore.account);
 
@@ -143,43 +143,9 @@ export default defineComponent({
       });
     };
 
-    // Start editing the scheduleTags cell in this row
-    const startEditingTags = () => {
-      props.params.api.startEditingCell({
-        rowIndex: props.params.node.rowIndex,
-        colKey: "scheduleTags",
-      });
-    };
-
-    // Start editing the timePicker cell in this row
-    const startEditingTimePicker = () => {
-      props.params.api.startEditingCell({
-        rowIndex: props.params.node.rowIndex,
-        colKey: "timePicker",
-      });
-    };
-
-    // Listen for editing stopped event to chain editors
-    function onEditingStopped(event: any) {
-      if (
-        event.rowIndex === props.params.node.rowIndex &&
-        event.column.getColId() === "scheduleTags"
-      ) {
-        // After tags editor closes, open timePicker
-        setTimeout(() => {
-          startEditingTimePicker();
-        }, 0);
-        // Remove listener after use
-        props.params.api.removeEventListener(
-          "cellEditingStopped",
-          onEditingStopped
-        );
-      }
-    }
     return {
       onDelete,
       onCopy,
-      editing,
       onPause,
       onResume,
       rootStore,

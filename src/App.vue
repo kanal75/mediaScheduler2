@@ -1,15 +1,16 @@
 <template>
-  <v-app>
-    <v-main>
+  <div class="app-root">
+    <div class="app-main">
       <ToolBar />
       <router-view />
       <Toast position="top-center" group="tc" />
-    </v-main>
-  </v-app>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, watch, onMounted } from "vue";
+import Toast from "primevue/toast";
 import ToolBar from "@/components/ToolBar.vue";
 import { useRefStore } from "@/store/RefStore";
 import { useAccountStore } from "@/store/AccountStore";
@@ -19,9 +20,7 @@ import { useNotificationStore } from "@/store/NotificationStore";
 
 export default defineComponent({
   name: "App",
-  components: {
-    ToolBar,
-  },
+  components: { ToolBar, Toast },
   setup() {
     const refStore = useRefStore();
     const accountStore = useAccountStore();

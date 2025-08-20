@@ -27,26 +27,27 @@
     <!-- Action Buttons -->
     <div class="p-grid new-schedule-form-actions" style="margin-top: 1.5rem">
       <div class="left-actions">
-        <Button
-          label="Cancel"
-          icon="pi pi-times"
-          class="p-button-info"
-          @click="cancelForm"
-        />
-        <Button
-          label="Reset"
-          icon="pi pi-refresh"
-          class="p-button-secondary"
-          @click="resetForm"
-        />
+        <Button label="Cancel" class="p-button-info" @click="cancelForm">
+          <template #icon>
+            <Icon name="times" />
+          </template>
+        </Button>
+        <Button label="Reset" class="p-button-secondary" @click="resetForm">
+          <template #icon>
+            <Icon name="refresh" />
+          </template>
+        </Button>
       </div>
       <div class="right-actions">
         <Button
           label="Add Schedule"
-          icon="pi pi-plus"
           @click="submitForm"
           class="p-button-primary"
-        />
+        >
+          <template #icon>
+            <Icon name="plus" />
+          </template>
+        </Button>
       </div>
     </div>
   </Form>
@@ -56,13 +57,14 @@
 import { defineComponent, ref, computed, watch } from "vue";
 import { useRefStore } from "@/store/RefStore";
 import { useRootStore } from "@/store/RootStore";
-import moment from "moment";
+import dayjs from "dayjs";
 import ProfileSelect from "@/components/NewSchedule/ProfileSelect.vue";
 import ScheduleTypeSelect from "@/components/NewSchedule/ScheduleTypeSelect.vue";
 import DateRangePickerSelect from "@/components/NewSchedule/DateRangePickerSelect.vue";
 import SpecificTimesSelect from "@/components/NewSchedule/SpecificTimesSelect.vue";
 import TagsSelect from "@/components/NewSchedule/TagsSelect.vue";
 import DurationSelect from "@/components/NewSchedule/DurationSelect.vue";
+import Icon from "@/components/icons/Icon.vue";
 
 export default defineComponent({
   name: "NewScheduleForm",
@@ -73,6 +75,7 @@ export default defineComponent({
     SpecificTimesSelect,
     TagsSelect,
     DurationSelect,
+    Icon,
   },
   setup() {
     const refStore = useRefStore();
@@ -130,7 +133,7 @@ export default defineComponent({
         "_" +
         rootStore.newSchedule.scheduleTypes +
         "_" +
-        moment().format("YYYYMMDDHHmmss");
+        dayjs().format("YYYYMMDDHHmmss");
       rootStore.newSchedule.id = newScheduleId;
     };
 

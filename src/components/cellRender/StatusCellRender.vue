@@ -16,9 +16,11 @@
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import dayjs from "dayjs";
+import Tag from "primevue/tag";
 
 export default defineComponent({
   name: "StatusCellRender",
+  components: { Tag },
   props: {
     params: {
       type: Object,
@@ -33,7 +35,7 @@ export default defineComponent({
       if (!Array.isArray(tp) || tp.length !== 2) {
         return "";
       }
-      const [s, e] = tp.map((t: any) => dayjs(t));
+      const [s, e] = tp.map((t: string) => dayjs(t));
       if (!s.isValid() || !e.isValid()) {
         return "Unscheduled";
       }
@@ -53,7 +55,7 @@ export default defineComponent({
       }
       switch (computedStatus.value) {
         case "Passed":
-          return "Primary";
+          return "primary";
         case "Active":
           return "success";
         case "Scheduled":

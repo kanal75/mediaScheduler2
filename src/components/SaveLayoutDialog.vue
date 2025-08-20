@@ -14,7 +14,7 @@
   >
     <template #header>
       <div class="dialog-header">
-        <i class="pi pi-save dialog-icon" />
+        <Icon name="save" class="dialog-icon" />
         <span class="headline">{{
           isEditing ? "Edit Layout" : "Save Layout"
         }}</span>
@@ -60,27 +60,28 @@
     <template #footer>
       <div class="dialog-footer flex items-center w-full">
         <div class="flex gap-2">
-          <Button
-            label="Cancel"
-            @click="closeDialog"
-            class="p-button-info"
-            icon="pi pi-times"
-          />
-          <Button
-            label="Reset"
-            @click="resetDialog"
-            class="p-button-secondary"
-            icon="pi pi-refresh"
-          />
+          <Button label="Cancel" @click="closeDialog" class="p-button-info">
+            <template #icon>
+              <Icon name="times" />
+            </template>
+          </Button>
+          <Button label="Reset" @click="resetDialog" class="p-button-secondary">
+            <template #icon>
+              <Icon name="refresh" />
+            </template>
+          </Button>
         </div>
         <div class="flex-1"></div>
         <Button
           :label="isEditing ? 'Update' : 'Save'"
           :disabled="!layoutName"
           @click="saveLayout"
-          icon="pi pi-check"
           class="p-button-primary save-btn"
-        />
+        >
+          <template #icon>
+            <Icon name="check" />
+          </template>
+        </Button>
       </div>
     </template>
   </Dialog>
@@ -88,6 +89,12 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, toRaw, watch } from "vue";
+import Icon from "@/components/icons/Icon.vue";
+import Dialog from "primevue/dialog";
+import InputText from "primevue/inputtext";
+import Textarea from "primevue/textarea";
+import Checkbox from "primevue/checkbox";
+import Button from "primevue/button";
 import { useAccountStore } from "@/store/AccountStore";
 import { useNotificationStore } from "@/store/NotificationStore";
 import { useGridStateStore } from "@/store/GridStateStore";
@@ -95,6 +102,7 @@ import { Layout } from "@/types";
 
 export default defineComponent({
   name: "SaveLayoutDialog",
+  components: { Dialog, InputText, Textarea, Checkbox, Button, Icon },
   props: {
     modelValue: {
       type: Boolean,
@@ -190,7 +198,6 @@ export default defineComponent({
           life: 3000,
         });
       } catch (error) {
-        console.error("Error saving layout:", error);
         notificationStore.showToast({
           severity: "error",
           summary: "Layout",

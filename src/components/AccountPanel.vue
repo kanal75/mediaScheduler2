@@ -8,7 +8,11 @@
     <!-- Top Section: dark gray with centered avatar -->
     <div class="top-section d-flex flex-column align-center justify-center">
       <div class="avatar-wrapper">
-        <Avatar icon="pi pi-user" size="xlarge" shape="circle" />
+        <Avatar size="xlarge" shape="circle">
+          <template #icon>
+            <Icon name="user" />
+          </template>
+        </Avatar>
       </div>
     </div>
     <!-- Middle Section: black background with form or user info -->
@@ -55,9 +59,15 @@ import { defineComponent, ref, computed } from "vue";
 import { useRefStore } from "@/store/RefStore";
 import { useAccountStore } from "@/store/AccountStore";
 import { useRouter } from "vue-router";
+import Drawer from "primevue/drawer";
+import InputText from "primevue/inputtext";
+import Button from "primevue/button";
+import Avatar from "primevue/avatar";
+import Icon from "@/components/icons/Icon.vue";
 
 export default defineComponent({
   name: "AccountPanel",
+  components: { Drawer, InputText, Button, Avatar, Icon },
   setup() {
     const refStore = useRefStore();
     const accountStore = useAccountStore();

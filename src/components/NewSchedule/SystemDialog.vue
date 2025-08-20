@@ -23,10 +23,11 @@ import { useRootStore } from "@/store/RootStore";
 import { useRefStore } from "@/store/RefStore";
 import { useSystemStore } from "@/store/SystemStore";
 import SystemForm from "@/components/NewSchedule/SystemForm.vue";
+import Dialog from "primevue/dialog";
 
 export default defineComponent({
   name: "SystemDialog",
-  components: { SystemForm },
+  components: { SystemForm, Dialog },
   setup() {
     const rootStore = useRootStore();
     const refStore = useRefStore();

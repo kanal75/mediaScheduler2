@@ -31,13 +31,42 @@
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useRootStore } from "@/store/RootStore";
 import type { TreeNode } from "primevue/treenode";
+import Toast from "primevue/toast";
+import Tree from "primevue/tree";
 
 export default defineComponent({
   name: "MediaTree",
+  components: { Toast, Tree },
   setup() {
     const rootStore = useRootStore();
     const isTreeLoading = ref(true);
     const selectedKey = ref<Record<string, boolean> | undefined>(undefined);
+
+    // Minimal shapes for incoming tree data to avoid any
+    type MediaFile = {
+      BSKEY?: string;
+      Path?: string;
+      Name?: string;
+      Data?: { General?: { Name?: string } };
+      [key: string]: unknown;
+    };
+
+    type MediaFolder = {
+      BSKEY?: string;
+      Path?: string;
+      Name?: string;
+      Folder?: MediaFolder | MediaFolder[];
+      File?: MediaFile | MediaFile[];
+      [key: string]: unknown;
+    };
+
+    type MediaTop = {
+      BSKEY?: string;
+      ID?: string;
+      Name?: string;
+      Folder?: MediaFolder | MediaFolder[];
+      [key: string]: unknown;
+    };
 
     onMounted(async () => {
       if (!rootStore.treeData) {
@@ -47,7 +76,7 @@ export default defineComponent({
     });
 
     // Recursively transforms a folder object into a tree node and builds unique keys by combining parent's key.
-    function transformFolder(folder: any, parentKey = ""): TreeNode {
+    function transformFolder(folder: MediaFolder, parentKey = ""): TreeNode {
       const baseKey =
         folder.BSKEY || folder.Path || folder.Name || "unknown-folder";
       const key = parentKey ? `${parentKey}_${baseKey}` : baseKey;
@@ -55,7 +84,7 @@ export default defineComponent({
       let children: TreeNode[] = [];
       if (folder.Folder) {
         children = Array.isArray(folder.Folder)
-          ? folder.Folder.map((child: Record<string, unknown>) =>
+          ? folder.Folder.map((child: MediaFolder) =>
               transformFolder(child, key)
             )
           : [transformFolder(folder.Folder, key)];
@@ -65,7 +94,7 @@ export default defineComponent({
         const filesArr = Array.isArray(folder.File)
           ? folder.File
           : [folder.File];
-        fileNodes = filesArr.map((f: any) => {
+        fileNodes = filesArr.map((f: MediaFile) => {
           const fBaseKey = f.BSKEY || f.Path || f.Name || "unknown-file";
           const fileKey = `${key}_${fBaseKey}`;
           return {
@@ -86,8 +115,10 @@ export default defineComponent({
 
     function transformTreeData(raw: unknown): TreeNode[] {
       if (!raw) return [];
-      const arrData = Array.isArray(raw) ? raw : [raw];
-      return arrData.map((item: Record<string, unknown>) => {
+      const arrData = Array.isArray(raw)
+        ? (raw as MediaTop[])
+        : [raw as MediaTop];
+      return arrData.map((item: MediaTop) => {
         const baseKey =
           item.BSKEY || item.ID || item.Name || "unknown-top-level";
         const key = baseKey as string;
@@ -95,10 +126,10 @@ export default defineComponent({
         let children: TreeNode[] = [];
         if (item.Folder) {
           children = Array.isArray(item.Folder)
-            ? item.Folder.map((child: Record<string, unknown>) =>
+            ? (item.Folder as MediaFolder[]).map((child: MediaFolder) =>
                 transformFolder(child, key)
               )
-            : [transformFolder(item.Folder, key)];
+            : [transformFolder(item.Folder as MediaFolder, key)];
         }
         return {
           key,
@@ -178,9 +209,12 @@ export default defineComponent({
             keys[k] = true;
           });
         } else {
-          console.log(
-            `No matching path found for profile ${profile} and target '${scheduleType}'.`
-          );
+          if (process.env.NODE_ENV !== "production") {
+            // eslint-disable-next-line no-console
+            console.log(
+              `No matching path found for profile ${profile} and target '${scheduleType}'.`
+            );
+          }
         }
       }
       return keys;
@@ -238,7 +272,10 @@ export default defineComponent({
             rootStore.setSelectedFile(null);
           }
         } else {
-          console.log("Node not found for key:", key);
+          if (process.env.NODE_ENV !== "production") {
+            // eslint-disable-next-line no-console
+            console.log("Node not found for key:", key);
+          }
           rootStore.setSelectedFile(null);
           rootStore.setSelectedFolder(null);
         }
@@ -257,9 +294,10 @@ export default defineComponent({
       ],
       ([newNodes, profile, scheduleType]) => {
         if (scheduleType === "system") return;
-        selectedKey.value = {};
+        // Clear selection to let MediaDialog/MediaGallery choose a sensible default
+        selectedKey.value = undefined;
         rootStore.setSelectedFile(null);
-        rootStore.setSelectedFolder({} as import("@/types").TreeNode);
+        rootStore.setSelectedFolder(null);
         const autoSelectScheduleTypes = computed(() => rootStore.scheduleTypes);
         if (
           newNodes &&
@@ -290,7 +328,11 @@ export default defineComponent({
         ? (event as { node: TreeNode }).node
         : event;
       if (!expNode) {
-        console.error("No expanded node found in event:", event);
+        // No expanded node found; safely ignore in production
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("No expanded node found in event:", event);
+        }
         return;
       }
     }

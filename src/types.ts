@@ -3,7 +3,7 @@ export interface Layout {
   id: string;
   name: string;
   description?: string;
-  state: any; // full grid state object
+  state: unknown; // full grid state object
   isDefault: boolean;
 }
 
@@ -29,7 +29,7 @@ export interface Leg {
 export interface TrackBetType {
   id: string;
   multiplepooltrackid?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface SystemFormModel {
@@ -50,7 +50,12 @@ export interface NewSchedule {
   priority?: number;
   status?: string;
   specificTime?: boolean;
-  specificTimes?: Array<[string, string]>;
+  specificTimes?: Array<{
+    days: string[];
+    from: string;
+    to: string;
+    allDay?: boolean;
+  }>;
   scheduleTags?: string[];
   metaData: SystemFormModel & { [key: string]: any };
 }
@@ -58,7 +63,7 @@ export interface NewSchedule {
 export interface NewScheduleMeta {
   profile: string;
   scheduleTypes: string;
-  metaData: any;
+  metaData: unknown;
 }
 
 export interface Tag {
@@ -82,7 +87,7 @@ export interface TreeNode {
   path: string;
   bskey: string;
   children: TreeNode[];
-  files: any[];
+  files: unknown[];
 }
 
 export interface Item {

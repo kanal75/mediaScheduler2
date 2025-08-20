@@ -64,9 +64,11 @@
 import { defineComponent } from "vue";
 import { useRootStore } from "@/store/RootStore";
 import { useDateRangePicker } from "@/components/composables/useDateRangePicker";
+import DatePicker from "primevue/datepicker";
 
 export default defineComponent({
   name: "DateRangePickerSelect",
+  components: { DatePicker },
   props: {
     attemptedSubmit: {
       type: Boolean,

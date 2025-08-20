@@ -8,10 +8,7 @@
       <template #default>
         {{ displayValue }}
         <span v-if="!isReadOnly" class="edit-icon">
-          <i
-            class="pi pi-pencil"
-            style="margin-left: 0.5em; color: #888; font-size: 1em"
-          ></i>
+          <Icon name="pencil" />
         </span>
         <span v-else class="readonly-label">{{ scheduleTypes }}</span>
       </template>
@@ -21,9 +18,12 @@
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
+import Tag from "primevue/tag";
+import Icon from "@/components/icons/Icon.vue";
 
 export default defineComponent({
   name: "DurationCellRender",
+  components: { Tag, Icon },
   props: {
     params: {
       type: Object,

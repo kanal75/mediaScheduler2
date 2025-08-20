@@ -26,21 +26,18 @@
             "
           >
             <span>{{ slotProps.option.label }}</span>
-            <i
+            <span
               v-if="
                 slotProps.option &&
                 getGroupLabelForOption(slotProps.option) === 'My Tags'
               "
-              class="pi pi-trash tag-trash-icon"
-              style="
-                margin-left: 8px;
-                color: #e53935;
-                cursor: pointer;
-                font-size: 1rem;
-              "
+              class="tag-trash-icon"
+              style="margin-left: 8px; cursor: pointer"
               @click.stop="onDeleteTag(slotProps.option)"
               title="Delete tag"
-            ></i>
+            >
+              <Icon name="trash" />
+            </span>
           </div>
         </template>
         <template #footer>
@@ -67,13 +64,16 @@
                 style="flex: 1; padding: 8px 16px; margin-right: 8px"
               />
               <Button
-                icon="pi pi-plus"
                 @click="addCustomTag"
                 class="input-btn-inside"
                 :disabled="!newTag.trim()"
                 style="height: 32px; width: 32px; padding: 0; min-width: 0"
                 tabindex="-1"
-              />
+              >
+                <template #icon>
+                  <Icon name="plus" />
+                </template>
+              </Button>
             </div>
             <div
               style="
@@ -96,10 +96,14 @@
 import { defineComponent, ref, computed } from "vue";
 import { useRootStore } from "@/store/RootStore";
 import MultiSelect from "primevue/multiselect";
-import type { Tag, Group } from "@/types";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import type { Tag } from "@/types";
+import Icon from "@/components/icons/Icon.vue";
 
 export default defineComponent({
   name: "TagsCellEditor",
+  components: { MultiSelect, Button, InputText, Icon },
   props: {
     params: { type: Object, required: true },
   },

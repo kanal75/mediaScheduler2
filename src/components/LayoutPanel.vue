@@ -11,21 +11,27 @@
     <Divider />
     <div class="layout-actions d-flex justify-end align-center gap-2 pa-2">
       <Button
-        icon="pi pi-plus"
         rounded
         @click="
           editDialog = true;
           layoutToEdit = null;
         "
         v-tooltip.bottom="'Add Layout'"
-      />
+      >
+        <template #icon>
+          <Icon name="plus" />
+        </template>
+      </Button>
       <Button
-        icon="pi pi-refresh"
         rounded
         severity="info"
         @click="resetToDefaultLayout"
         v-tooltip.bottom="'Reset to Default Layout'"
-      />
+      >
+        <template #icon>
+          <Icon name="refresh" />
+        </template>
+      </Button>
     </div>
     <div>
       <div
@@ -44,36 +50,48 @@
           </div>
           <div class="layout-actions d-flex align-center gap-2">
             <Button
-              icon="pi pi-star"
               v-if="layout.isDefault"
               rounded
               severity="success"
               @click.stop="toggleStar(layout)"
               v-tooltip.bottom="'Set as Default'"
-            />
+            >
+              <template #icon>
+                <Icon name="star" />
+              </template>
+            </Button>
             <Button
-              icon="pi pi-star"
               v-else
               rounded
               text
               severity="success"
               @click.stop="toggleStar(layout)"
               v-tooltip.bottom="'Set as Default'"
-            />
+            >
+              <template #icon>
+                <Icon name="star" />
+              </template>
+            </Button>
             <Button
-              icon="pi pi-pencil"
               rounded
               severity="warning"
               @click.stop="editLayout(layout)"
               v-tooltip.bottom="'Edit Layout'"
-            />
+            >
+              <template #icon>
+                <Icon name="pencil" />
+              </template>
+            </Button>
             <Button
-              icon="pi pi-trash"
               rounded
               severity="danger"
               @click.stop="confirmDelete(layout)"
               v-tooltip.bottom="'Delete Layout'"
-            />
+            >
+              <template #icon>
+                <Icon name="trash" />
+              </template>
+            </Button>
           </div>
         </div>
       </div>
@@ -101,21 +119,25 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
+import Icon from "@/components/icons/Icon.vue";
 import SaveLayoutDialog from "@/components/SaveLayoutDialog.vue";
 import { useRefStore } from "@/store/RefStore";
 import { useAccountStore } from "@/store/AccountStore";
+// Local PrimeVue components (minimize globals)
+import Drawer from "primevue/drawer";
+import Divider from "primevue/divider";
+import Dialog from "primevue/dialog";
 
 type Layout = {
   id: string;
   name?: string;
   description?: string;
   isDefault?: boolean;
-  [key: string]: any;
-};
+} & Record<string, unknown>;
 
 export default defineComponent({
   name: "LayoutPanel",
-  components: { SaveLayoutDialog },
+  components: { SaveLayoutDialog, Drawer, Divider, Dialog, Icon },
   emits: ["layoutSelected"],
   setup(_, { emit }) {
     const refStore = useRefStore();

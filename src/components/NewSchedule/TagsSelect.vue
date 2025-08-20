@@ -26,21 +26,18 @@
               "
             >
               <span>{{ slotProps.option.label }}</span>
-              <i
+              <span
                 v-if="
                   slotProps.option &&
                   getGroupLabelForOption(slotProps.option) === 'My Tags'
                 "
-                class="pi pi-trash tag-trash-icon"
-                style="
-                  margin-left: 8px;
-                  color: #e53935;
-                  cursor: pointer;
-                  font-size: 1rem;
-                "
+                class="tag-trash-icon"
+                style="margin-left: 8px; cursor: pointer"
                 @click.stop="onDeleteTag(slotProps.option)"
                 title="Delete tag"
-              ></i>
+              >
+                <Icon name="trash" />
+              </span>
             </div>
           </template>
         </MultiSelect>
@@ -52,7 +49,6 @@
             style="width: 100%; padding-right: 2.5rem"
           />
           <Button
-            icon="pi pi-plus"
             @click="addCustomTag"
             class="input-btn-inside"
             :disabled="!newTag.trim()"
@@ -67,7 +63,11 @@
               min-width: 0;
             "
             tabindex="-1"
-          />
+          >
+            <template #icon>
+              <Icon name="plus" />
+            </template>
+          </Button>
         </div>
       </div>
     </div>
@@ -77,9 +77,14 @@
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
 import { useRootStore } from "@/store/RootStore";
+import MultiSelect from "primevue/multiselect";
+import InputText from "primevue/inputtext";
+import Button from "primevue/button";
+import Icon from "@/components/icons/Icon.vue";
 
 export default defineComponent({
   name: "TagsSelect",
+  components: { MultiSelect, InputText, Button, Icon },
   setup() {
     const rootStore = useRootStore();
 
