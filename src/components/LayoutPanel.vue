@@ -123,6 +123,7 @@ import Icon from "@/components/icons/Icon.vue";
 import SaveLayoutDialog from "@/components/SaveLayoutDialog.vue";
 import { useRefStore } from "@/store/RefStore";
 import { useAccountStore } from "@/store/AccountStore";
+import { DEFAULT_LAYOUT_STATE } from "@/constants/defaultLayout";
 // Local PrimeVue components (minimize globals)
 import Drawer from "primevue/drawer";
 import Divider from "primevue/divider";
@@ -173,40 +174,26 @@ export default defineComponent({
     const deleteConfirmed = async () => {
       if (layoutToDelete.value) {
         await accountStore.deleteLayout(layoutToDelete.value.id);
+        // After deletion, select the (new) default or first layout
+        const afterLayouts = accountStore.account?.layouts || [];
+        const newDefault =
+          afterLayouts.find((l) => l.isDefault) || afterLayouts[0];
+        if (newDefault) emit("layoutSelected", newDefault as Layout);
       }
       deleteDialog.value = false;
       layoutToDelete.value = null;
     };
     const onLayoutSaved = async (savedLayout: Layout) => {
+      // New layout should be selected; if it was marked default, set it so others are unmarked
       await accountStore.setDefaultLayout(savedLayout.id);
       editDialog.value = false;
       emit("layoutSelected", savedLayout);
     };
 
-    // Guest layout state (matches the default grid columns/options for not-logged-in users)
+    // Guest layout state (shared constant)
     const guestLayout = {
       name: "Guest Layout",
-      state: {
-        columnState: [
-          { colId: "profile", hide: false },
-          { colId: "scheduleTypes", hide: false },
-          { colId: "status", hide: false },
-          { colId: "priority", hide: true },
-          { colId: "timePicker", hide: false },
-          { colId: "specificTimes", hide: false },
-          { colId: "File Information", hide: true },
-          { colId: "General", hide: false },
-          { colId: "Media Information", hide: false },
-          { colId: "Url", hide: false },
-          { colId: "scheduleTags", hide: false },
-          { colId: "images", hide: false },
-          { colId: "metaData.duration", hide: false },
-          { colId: "actions", hide: false },
-        ],
-        filterModel: {},
-        sortModel: [],
-        // Add other grid state defaults as needed
-      },
+      state: JSON.parse(JSON.stringify(DEFAULT_LAYOUT_STATE)),
     };
 
     const resetToDefaultLayout = async () => {

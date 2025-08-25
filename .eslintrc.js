@@ -24,5 +24,11 @@ module.exports = {
         "prettier/prettier": "off",
       },
     },
+    {
+      files: ["src/constants/defaultLayout.ts"],
+      rules: {
+        "prettier/prettier": "off",
+      },
+    },
   ],
 };

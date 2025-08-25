@@ -3,12 +3,13 @@ import { defineStore } from "pinia";
 import axios from "axios";
 import { useNotificationStore } from "./NotificationStore";
 import type { Layout, AccountSettings, Account } from "@/types";
+import { DEFAULT_LAYOUT_STATE } from "@/constants/defaultLayout";
 
-// Define your API base URL based on the environment
+// Define your API base URL based on the environment (no trailing slash to prevent // in paths)
 const isProd = process.env.NODE_ENV === "production";
 const baseURL = isProd
-  ? window.location.origin + "/ROOT/MEDIASCHEDULER/"
-  : "http://127.0.0.1/ROOT/MEDIASCHEDULER/";
+  ? window.location.origin + "/ROOT/MEDIASCHEDULER"
+  : "http://127.0.0.1/ROOT/MEDIASCHEDULER";
 
 export const useAccountStore = defineStore("AccountStore", {
   state: () => ({
@@ -69,24 +70,50 @@ export const useAccountStore = defineStore("AccountStore", {
         },
       };
 
-      // Create the new account object
+      const defaultLayout: Layout = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: accountData.firstName || "Default",
+        description: "Auto-created on registration",
+        state: JSON.parse(JSON.stringify(DEFAULT_LAYOUT_STATE)),
+        isDefault: true,
+      };
+
+      // Create the new account object with an initial default layout
       const newAccount: Account = {
         id,
         firstName: accountData.firstName || "",
         lastName: accountData.lastName,
-        layouts: accountData.layouts || [],
+        layouts:
+          Array.isArray(accountData.layouts) && accountData.layouts.length > 0
+            ? accountData.layouts
+            : [defaultLayout],
         settings: mergedSettings,
       };
 
-      // Remove putAccount call from registration
-      this.account = newAccount;
+      // Persist the account on the backend so it exists for future updates/sign-ins
       const notificationStore = useNotificationStore();
-      notificationStore.showToast({
-        severity: "success",
-        summary: "Registration",
-        detail: "Account registered successfully.",
-        life: 3000,
-      });
+      try {
+        await axios.put(
+          `${baseURL}/Accounts/Account[id='${newAccount.id}']`,
+          newAccount
+        );
+        this.account = newAccount;
+        notificationStore.showToast({
+          severity: "success",
+          summary: "Registration",
+          detail: "Account created successfully.",
+          life: 3000,
+        });
+      } catch (error) {
+        // Graceful fallback: keep working locally if backend is unavailable
+        this.account = newAccount;
+        notificationStore.showToast({
+          severity: "warn",
+          summary: "Registration",
+          detail: "Account created locally; server save failed.",
+          life: 4000,
+        });
+      }
     },
 
     async signIn(id: string) {
@@ -205,31 +232,50 @@ export const useAccountStore = defineStore("AccountStore", {
         if (!layout.id) {
           layout.id = Math.random().toString(36).substr(2, 9);
         }
+        // If no state was provided for a brand-new layout, fall back to the default state (deep-cloned)
+        if (layout.state == null) {
+          layout.state = JSON.parse(JSON.stringify(DEFAULT_LAYOUT_STATE));
+        }
         this.account.layouts.push({ ...layout });
       }
-      // Only update default if it changed
+      // Enforce a single default: if this layout is marked default, unmark others.
       if (layout.isDefault) {
-        const alreadyDefault = this.account.layouts.find(
-          (l) => l.isDefault && l.id === layout.id
+        this.account.layouts = this.account.layouts.map((l) =>
+          l.id === layout.id
+            ? { ...l, isDefault: true }
+            : { ...l, isDefault: false }
         );
-        if (!alreadyDefault) {
-          this.account.layouts = this.account.layouts.map((l) =>
-            l.id === layout.id
-              ? { ...l, isDefault: true }
-              : { ...l, isDefault: false }
-          );
-        }
       }
-      return await this.putAccount(this.account);
+      // Ensure at least one default exists (pick the first if none)
+      if (!this.account.layouts.some((l) => l.isDefault)) {
+        const [first] = this.account.layouts;
+        if (first) first.isDefault = true;
+      }
+      // Persist and return the saved layout (with final ID) for callers to select
+      await this.putAccount(this.account);
+      return this.account.layouts.find((l) => l.id === layout.id);
     },
 
     // Delete a layout.
     async deleteLayout(layoutId: string) {
       if (!this.account) return;
       if (!this.account.layouts) this.account.layouts = [];
+      const wasDefault = this.account.layouts.find(
+        (l) => l.id === layoutId
+      )?.isDefault;
       this.account.layouts = this.account.layouts.filter(
         (l) => l.id !== layoutId
       );
+      // If we deleted the default or no default remains, set the first as default
+      if (this.account.layouts.length > 0) {
+        const hasDefault = this.account.layouts.some((l) => l.isDefault);
+        if (wasDefault || !hasDefault) {
+          this.account.layouts = this.account.layouts.map((l, idx) => ({
+            ...l,
+            isDefault: idx === 0,
+          }));
+        }
+      }
       return await this.putAccount(this.account);
     },
 

@@ -98,6 +98,7 @@ import Button from "primevue/button";
 import { useAccountStore } from "@/store/AccountStore";
 import { useNotificationStore } from "@/store/NotificationStore";
 import { useGridStateStore } from "@/store/GridStateStore";
+import { DEFAULT_LAYOUT_STATE } from "@/constants/defaultLayout";
 import { Layout } from "@/types";
 
 export default defineComponent({
@@ -113,7 +114,7 @@ export default defineComponent({
       default: null,
     },
   },
-  emits: ["update:modelValue"],
+  emits: ["update:modelValue", "layoutSaved"],
   setup(props, { emit }) {
     const accountStore = useAccountStore();
     const notificationStore = useNotificationStore();
@@ -170,11 +171,15 @@ export default defineComponent({
     const saveLayout = async () => {
       const data = props.layoutData as Layout | null;
       const layoutId = isEditing.value && data ? data.id : "";
+      // When creating a brand new layout, use the default layout state instead of inheriting current grid state
+      const stateForNew = layoutId
+        ? plainGridState.value
+        : JSON.parse(JSON.stringify(DEFAULT_LAYOUT_STATE));
       const newLayout: Layout = {
         id: layoutId,
         name: layoutName.value,
         description: layoutDescription.value,
-        state: plainGridState.value,
+        state: stateForNew,
         isDefault: makeDefault.value,
       };
 
@@ -190,13 +195,14 @@ export default defineComponent({
       }
 
       try {
-        await accountStore.saveLayout(newLayout);
+        const saved = await accountStore.saveLayout(newLayout);
         notificationStore.showToast({
           severity: "success",
           summary: "Layout",
           detail: "Layout saved successfully.",
           life: 3000,
         });
+        if (saved) emit("layoutSaved", saved);
       } catch (error) {
         notificationStore.showToast({
           severity: "error",
