@@ -21,7 +21,7 @@
     <div class="schedule-input">
       <DurationSelect
         v-model="rootStore.newSchedule.metaData.duration"
-        :showError="durationError"
+        :showError="durationError && !durationValid"
       />
     </div>
     <!-- Action Buttons -->
@@ -57,6 +57,7 @@
 import { defineComponent, ref, computed, watch } from "vue";
 import { useRefStore } from "@/store/RefStore";
 import { useRootStore } from "@/store/RootStore";
+import { useNotificationStore } from "@/store/NotificationStore";
 import dayjs from "dayjs";
 import ProfileSelect from "@/components/NewSchedule/ProfileSelect.vue";
 import ScheduleTypeSelect from "@/components/NewSchedule/ScheduleTypeSelect.vue";
@@ -80,6 +81,7 @@ export default defineComponent({
   setup() {
     const refStore = useRefStore();
     const rootStore = useRootStore();
+    const notificationStore = useNotificationStore();
     const attemptedSubmit = ref(false);
     const dateRangePickerRef = ref();
     const durationError = ref(false);
@@ -93,27 +95,30 @@ export default defineComponent({
         }
       }
     );
+    // Duration validity derived from model (treat clip/music as valid automatically)
+    const durationValid = computed(() => {
+      const t = (rootStore.newSchedule.scheduleTypes || "").toLowerCase();
+      if (t === "clip" || t === "music") return true;
+      const val = rootStore.newSchedule.metaData.duration || "";
+      return /^\d{2}:\d{2}:\d{2}:\d{2}$/.test(val);
+    });
+
     const isFormValid = computed(() => {
-      const { profile, scheduleTypes, timePicker, metaData } =
-        rootStore.newSchedule;
+      const { profile, scheduleTypes, timePicker } = rootStore.newSchedule;
       let valid =
         !!profile &&
         !!scheduleTypes &&
         Array.isArray(timePicker) &&
         timePicker.length === 2;
-      // Always require duration
-      valid =
-        valid && /^\d{2}:\d{2}:\d{2}:\d{2}$/.test(metaData.duration || "");
+      // Require duration via computed validity (handles clip/music)
+      valid = valid && durationValid.value;
       return valid;
     });
+
     const submitForm = () => {
       attemptedSubmit.value = true;
-      // Always validate duration
-      if (
-        !/^\d{2}:\d{2}:\d{2}:\d{2}$/.test(
-          rootStore.newSchedule.metaData.duration || ""
-        )
-      ) {
+      // Always validate duration (unless clip/music which is covered in durationValid)
+      if (!durationValid.value) {
         durationError.value = true;
         return;
       } else {
@@ -124,8 +129,36 @@ export default defineComponent({
         rootStore.putNewSchedule(rootStore.newSchedule);
         refStore.showNewScheduleDialog = false;
         rootStore.resetNewSchedule();
+      } else {
+        // Build a concise message about missing fields
+        const ns = rootStore.newSchedule;
+        const missing: string[] = [];
+        if (!ns.profile) missing.push("Profile");
+        if (!ns.scheduleTypes) missing.push("Type");
+        if (!Array.isArray(ns.timePicker) || ns.timePicker.length !== 2)
+          missing.push("Date range");
+        if (!durationValid.value) missing.push("Duration");
+        notificationStore.showToast({
+          severity: "warn",
+          summary: "Form incomplete",
+          detail:
+            missing.length > 0
+              ? `Please fill: ${missing.join(", ")}.`
+              : "Form is not valid.",
+          life: 3000,
+        });
       }
     };
+
+    // Auto-clear durationError when value becomes valid
+    watch(
+      () => rootStore.newSchedule.metaData.duration,
+      () => {
+        if (durationValid.value) {
+          durationError.value = false;
+        }
+      }
+    );
 
     const generateNewScheduleId = () => {
       const newScheduleId =
@@ -172,6 +205,7 @@ export default defineComponent({
       resetForm,
       dateRangePickerRef,
       durationError,
+      durationValid,
     };
   },
 });

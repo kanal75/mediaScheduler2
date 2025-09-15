@@ -472,48 +472,54 @@ export const useRootStore = defineStore("RootStore", {
       this.resetMedia();
     },
 
-    // Add a new tag to a group and push to API
+    // Add a new tag to a group and push to API (creates group if missing)
     async pushTagToGroup(groupId: string, tag: Tag) {
       try {
-        // Find the group
-        const group = this.scheduleTagsGroups.find((g) => g.Id === groupId);
+        // Ensure group exists locally and on backend
+        let group = this.scheduleTagsGroups.find((g) => g.Id === groupId);
         if (!group) {
-          throw new Error(`Group '${groupId}' not found`);
+          // Create group on backend first (idempotent PUT)
+          const groupPayload = { Id: groupId, BSKEY: groupId };
+          await axios.put(
+            `${baseURL}MEDIASCHEDULER/ScheduleTags/Group[Id='${groupId}']`,
+            groupPayload
+          );
+          // Create minimal local group to attach the tag; full refresh happens below
+          group = { Id: groupId, BSKEY: groupId, Tag: [] } as Group;
+          this.scheduleTagsGroups = [...this.scheduleTagsGroups, group];
         }
-        // Prepare the payload structure as expected by the backend
-        // prettier-ignore
+
+        // Prepare the payload structure as expected by the backend (group context)
         const payload = {
           Id: group.Id,
           BSKEY: group.BSKEY,
-        };
-        // Use PUT for idempotent upsert
+        } as { Id: string; BSKEY?: string };
+
+        // Upsert the tag under the group (idempotent)
         await axios.put(
           `${baseURL}MEDIASCHEDULER/ScheduleTags/Group[Id='${groupId}']/ScheduleTag[Id='${tag.Id}']`,
           payload
         );
-        // Update local state
+
+        // Update local state optimistically (will be refreshed)
         if (Array.isArray(group.Tag)) {
-          // Replace if tag exists, else push
           const idx = group.Tag.findIndex((t) => t.Id === tag.Id);
-          if (idx !== -1) {
-            group.Tag[idx] = tag;
-          } else {
-            group.Tag.push(tag);
-          }
+          if (idx !== -1) group.Tag[idx] = tag;
+          else group.Tag.push(tag);
         } else if (group.Tag) {
-          if (group.Tag.Id === tag.Id) {
-            group.Tag = [tag];
-          } else {
-            group.Tag = [group.Tag, tag];
-          }
+          group.Tag = group.Tag.Id === tag.Id ? [tag] : [group.Tag, tag];
         } else {
           group.Tag = [tag];
         }
+
         if (process.env.NODE_ENV !== "production") {
           // eslint-disable-next-line no-console
-          console.log("Tag upserted:", tag);
+          console.log("Tag upserted:", tag, "in group:", groupId);
         }
+
+        // Refresh from backend to ensure canonical state
         await this.fetchScheduleTagsGroups();
+
         const notificationStore = useNotificationStore();
         notificationStore.showToast({
           severity: "success",

@@ -154,7 +154,14 @@ export default defineComponent({
         localError.value = false;
       }
     };
+    // Treat disabled (clip/music) as always valid; otherwise require a finite number >= 5
+    const isValid = computed(() => {
+      if (isDisabled.value) return true;
+      const v = displaySeconds.value as unknown as number;
+      return Number.isFinite(v) && v >= 5;
+    });
     const showErrorComputed = computed(() => {
+      if (isValid.value) return false;
       return props.showError || localError.value;
     });
     return {
@@ -163,6 +170,7 @@ export default defineComponent({
       showErrorComputed,
       isDisabled,
       mediaTimeCode,
+      isValid,
     };
   },
 });

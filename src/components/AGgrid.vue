@@ -20,7 +20,15 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, toRaw, computed } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  toRaw,
+  computed,
+  onMounted,
+  nextTick,
+} from "vue";
 import { AgGridVue } from "ag-grid-vue3";
 import {
   ModuleRegistry,
@@ -71,6 +79,8 @@ import SpecificTimesCellEditor from "@/components/cellRender/SpecificTimesCellEd
 import DurationCellEditor from "@/components/cellRender/DurationCellEditor.vue";
 import DurationCellRender from "@/components/cellRender/DurationCellRender.vue";
 import type { Item } from "@/types";
+import { safeParseLayoutState } from "@/utils/safeParseLayout";
+import { areStatesMeaningfullyDifferent } from "@/utils/layoutState";
 
 // Stores
 import { useRootStore } from "@/store/RootStore";
@@ -137,10 +147,23 @@ export default defineComponent({
     type ItemWithMeta = Item & { metaData?: MetaDataLite };
 
     // Ref to skip next layout apply after update
-    const skipNextLayoutApply = ref(false);
+    const skipNextLayoutApply = ref(false); // legacy guard (kept for safety; can remove later)
+    const skipLayoutApplyCount = ref(0); // counter for skipping layout apply after self-saves
 
-    // Loading overlay for layout/filters
-    const isLayoutApplying = ref(false);
+    // Debug flag (toggle in console: window.__GRID_DEBUG__=true)
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    const debugEnabled = (window.__GRID_DEBUG__ as boolean) ?? false;
+    const dlog = (...args: unknown[]) => {
+      if (debugEnabled) {
+        // eslint-disable-next-line no-console
+        console.log("[AGgrid]", ...args);
+      }
+    };
+
+    // Layout application flags & revision tracking (must be declared before watchers)
+    const isApplyingLayout = ref(false);
+    const lastAppliedRevision = ref<number | null>(null);
 
     // Define themes.
     const darkTheme = themeQuartz.withPart(colorSchemeDark);
@@ -180,19 +203,39 @@ export default defineComponent({
           : undefined,
       };
     }
-    function setFullGridState(state: FullGridState) {
+    function setFullGridState(
+      state: FullGridState | string | null | undefined
+    ) {
       if (!gridApi.value || !state) return;
-      isLayoutApplying.value = true;
+      // Some backends may return the layout state as a JSON string; parse defensively.
+      try {
+        if (typeof state === "string") {
+          state = JSON.parse(state) as FullGridState;
+        }
+      } catch (e) {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.warn("[AGgrid] Failed to parse layout state string:", e);
+        }
+        return;
+      }
+      isApplyingLayout.value = true;
       // setState is available in newer AG Grid versions; call it if present.
       const apiWithState = gridApi.value as unknown as {
         setState?: (s: unknown) => void;
       };
       apiWithState.setState?.(state as unknown);
       // Delay filter application to ensure grid is ready
-      if (state.filterModel && gridApi.value && gridApi.value.setFilterModel) {
+      if (
+        (state as FullGridState).filterModel &&
+        gridApi.value &&
+        gridApi.value.setFilterModel
+      ) {
         setTimeout(() => {
           if (gridApi.value) {
-            gridApi.value.setFilterModel(state.filterModel as FilterModel);
+            gridApi.value.setFilterModel(
+              (state as FullGridState).filterModel as FilterModel
+            );
             if (gridApi.value.onFilterChanged) {
               gridApi.value.onFilterChanged();
             }
@@ -203,13 +246,13 @@ export default defineComponent({
               gridApi.value.redrawRows();
             }
             // Hide loading overlay after filters are applied
-            isLayoutApplying.value = false;
+            isApplyingLayout.value = false;
           } else {
-            isLayoutApplying.value = false;
+            isApplyingLayout.value = false;
           }
         }, 0);
       } else {
-        isLayoutApplying.value = false;
+        isApplyingLayout.value = false;
       }
     }
 
@@ -520,7 +563,7 @@ export default defineComponent({
           field: "actions",
           headerName: "Actions",
           cellRenderer: ActionsCellRenderer,
-          maxWidth: 150,
+          maxWidth: 250,
         },
       ],
       defaultColDef: {
@@ -564,7 +607,7 @@ export default defineComponent({
         gridApi.value.setSideBarVisible(desiredSidebarVisible.value);
         // If there is an initial state (e.g. after refresh), apply it fully (including filters)
         if (initialState.value) {
-          isLayoutApplying.value = true;
+          isApplyingLayout.value = true;
           setTimeout(() => {
             const init = initialState.value;
             if (init) {
@@ -733,47 +776,47 @@ export default defineComponent({
       },
       onCellValueChanged() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onSortChanged() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onFilterChanged() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onColumnMoved() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onColumnResized() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onColumnRowGroupChanged() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onColumnVisible() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onDisplayedColumnsChanged() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onColumnPinned() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onColumnPivotChanged() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
       onColumnPivotModeChanged() {
         captureGridState();
-        updateCurrentLayout();
+        scheduleLayoutSave();
       },
     });
 
@@ -791,46 +834,67 @@ export default defineComponent({
       }
     );
 
-    // Deep watch for account changes.
-    watch(
-      () => accountStore.account,
-      (account) => {
-        if (skipNextLayoutApply.value) {
-          skipNextLayoutApply.value = false;
-          return;
-        }
-        if (account) {
-          const defaultLayout = account.layouts?.find((l) => l.isDefault);
-          if (defaultLayout && defaultLayout.state) {
-            if (gridApi.value) {
-              const apiWithState = gridApi.value as unknown as {
-                setState?: (s: unknown) => void;
-              };
-              apiWithState.setState?.(defaultLayout.state as unknown);
-              setTimeout(async () => {
-                await setFullGridState(defaultLayout.state as FullGridState);
-              }, 0);
-            } else {
-              initialState.value = defaultLayout.state as FullGridState;
-              gridKey.value++;
-            }
-          } else {
-            initialState.value = undefined;
-            gridKey.value++;
-            if (process.env.NODE_ENV !== "production") {
-              // eslint-disable-next-line no-console
-              console.log(
-                "No default layout found; reverting to original layout"
-              );
-            }
+    const selectedLayoutId = computed(() => refStore.currentLayoutId);
+    const layoutsRef = computed(() => accountStore.account?.layouts);
+
+    function applySelectedOrDefaultLayout() {
+      if (!accountStore.account || !accountStore.account.layouts) return;
+      const selectedId = refStore.currentLayoutId;
+      const targetLayout = accountStore.account.layouts.find((l) =>
+        selectedId ? l.id === selectedId : !!l.isDefault
+      ) as (Layout & { stateRevision?: number }) | undefined;
+      if (!targetLayout || !targetLayout.state) return;
+      // Migration / normalization: ensure layoutVersion
+      const vLayout = targetLayout as Layout & { layoutVersion?: number };
+      if (!vLayout.layoutVersion) {
+        vLayout.layoutVersion = 1;
+        accountStore.queueLayoutsSave();
+        dlog("Migrated layoutVersion on apply", vLayout.id);
+      }
+      // Gate by revision to avoid re-applying identical state
+      const revision = targetLayout.stateRevision || 0;
+      if (
+        lastAppliedRevision.value != null &&
+        revision === lastAppliedRevision.value
+      ) {
+        return; // no change
+      }
+      const parsed = safeParseLayoutState(targetLayout.state);
+      if (!parsed) return;
+      isApplyingLayout.value = true;
+      setFullGridState(parsed as FullGridState);
+      initialState.value = parsed as FullGridState;
+      if (!gridApi.value) {
+        gridKey.value++;
+      }
+      lastAppliedRevision.value = revision;
+      // Release suppression shortly after apply so debounced updates can resume
+      setTimeout(() => {
+        isApplyingLayout.value = false;
+      }, 50);
+    }
+
+    // Defer initial apply until mount to avoid null component hydration race
+    onMounted(() => {
+      watch(
+        [selectedLayoutId, layoutsRef],
+        () => {
+          if (skipLayoutApplyCount.value > 0) {
+            skipLayoutApplyCount.value--;
+            return;
           }
-        } else {
-          initialState.value = undefined;
-          gridKey.value++;
-        }
-      },
-      { immediate: true, deep: true }
-    );
+          // Ensure grid API is ready or schedule on nextTick
+          if (!gridApi.value) {
+            nextTick(() => applySelectedOrDefaultLayout());
+          } else {
+            applySelectedOrDefaultLayout();
+          }
+        },
+        { immediate: true }
+      );
+    });
+
+    // Remove duplicate declarations later (will rely on these)
 
     // Watch for changes in account settings to update grid options and sidebar
     watch(
@@ -877,8 +941,25 @@ export default defineComponent({
             (l) => l.isDefault
           );
           if (defaultLayout && defaultLayout.state) {
-            setFullGridState(defaultLayout.state);
-            initialState.value = defaultLayout.state;
+            let layoutState: FullGridState | string = defaultLayout.state as
+              | FullGridState
+              | string;
+            try {
+              if (typeof layoutState === "string") {
+                layoutState = JSON.parse(layoutState) as FullGridState;
+              }
+            } catch (e) {
+              if (process.env.NODE_ENV !== "production") {
+                // eslint-disable-next-line no-console
+                console.warn(
+                  "[AGgrid] Could not parse default layout state (late apply):",
+                  e
+                );
+              }
+              return;
+            }
+            setFullGridState(layoutState);
+            initialState.value = layoutState as FullGridState;
             gridKey.value++;
             hasAppliedDefaultLayout.value = true;
             if (process.env.NODE_ENV !== "production") {
@@ -899,14 +980,16 @@ export default defineComponent({
       if (!accountStore.account || !accountStore.account.layouts) {
         return;
       }
-      const defaultLayout = accountStore.account.layouts.find(
-        (l) => l.isDefault
+      // Target the currently selected layout if available; otherwise default
+      const selectedId = refStore.currentLayoutId;
+      const targetLayout = accountStore.account.layouts.find((l) =>
+        selectedId ? l.id === selectedId : !!l.isDefault
       );
-      if (!defaultLayout) {
+      if (!targetLayout) {
         notificationStore.showToast({
           severity: "error",
           summary: "Layout",
-          detail: "No default layout selected.",
+          detail: "No layout selected.",
           life: 3000,
         });
         return;
@@ -920,24 +1003,249 @@ export default defineComponent({
           filterModel: gridApi.value.getFilterModel(),
         };
       }
-      const updatedLayout = { ...defaultLayout, state: fullState };
-      // Update the account's layouts by replacing the default layout.
+      const updatedLayout = { ...targetLayout, state: fullState };
+      // Update the account's layouts by replacing the target layout.
       const updatedLayouts = accountStore.account.layouts.map((l) =>
-        l.id === defaultLayout.id ? updatedLayout : l
+        l.id === targetLayout.id ? updatedLayout : l
       );
       skipNextLayoutApply.value = true;
       accountStore.account.layouts = updatedLayouts;
-      await accountStore.putAccount(accountStore.account);
+      // Use queued save infrastructure
+      accountStore.queueLayoutsSave();
     };
 
-    // Expose onLayoutSelected so that the parent component can call it.
-    const onLayoutSelected = (layout: Layout) => {
-      setFullGridState(layout.state as FullGridState);
-      initialState.value = layout.state as FullGridState;
-      gridKey.value++;
+    interface LayoutWithMeta extends Layout {
+      stateRevision?: number;
+      __localRevision?: number;
+    }
+    let localLayoutRevision = 0;
+    let initialLayoutPersisted = false;
+    // --- Autosave diagnostics (debug only) ---
+    const AUTOSAVE_DIAG = {
+      gridEvents: 0,
+      scheduleCalls: 0,
+      debounceFires: 0,
+      updateInvocations: 0,
+      skippedIsApplying: 0,
+      skippedNoApi: 0,
+      skippedNoAccount: 0,
+      skippedNoLayout: 0,
+      skippedNoDiff: 0,
+      saved: 0,
+      forcedInitial: 0,
+      lastDiff: false,
+      lastRevision: 0,
     };
-    expose({ onLayoutSelected, openSaveDialog });
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.__GRID_AUTOSAVE = AUTOSAVE_DIAG;
+    async function updateCurrentLayoutInternal() {
+      AUTOSAVE_DIAG.updateInvocations++;
+      if (isApplyingLayout.value) {
+        AUTOSAVE_DIAG.skippedIsApplying++;
+        return; // don't persist while applying
+      }
+      if (!gridApi.value) {
+        AUTOSAVE_DIAG.skippedNoApi++;
+        return;
+      }
+      if (!accountStore.account || !accountStore.account.layouts) {
+        AUTOSAVE_DIAG.skippedNoAccount++;
+        return;
+      }
+      const selectedId = refStore.currentLayoutId;
+      const targetLayout = accountStore.account.layouts.find((l) =>
+        selectedId ? l.id === selectedId : !!l.isDefault
+      ) as LayoutWithMeta | undefined;
+      if (!targetLayout) {
+        AUTOSAVE_DIAG.skippedNoLayout++;
+        return;
+      }
+      let fullState = getFullGridState();
+      if (gridApi.value && gridApi.value.getFilterModel) {
+        fullState = {
+          ...fullState,
+          filterModel: gridApi.value.getFilterModel(),
+        };
+      }
+      // Skip if no meaningful diff from existing (column/filter/sort/group/pivot aspects)
+      const diff = areStatesMeaningfullyDifferent(
+        targetLayout.state,
+        fullState
+      );
+      if (!diff && !initialLayoutPersisted) {
+        dlog("Force initial layout persist");
+        AUTOSAVE_DIAG.forcedInitial++;
+      } else if (!diff) {
+        dlog("Skip save (no meaningful diff)");
+        AUTOSAVE_DIAG.skippedNoDiff++;
+        AUTOSAVE_DIAG.lastDiff = false;
+        return;
+      }
+      const revision = (targetLayout.stateRevision || 0) + 1;
+      // In-place mutation instead of replacing layouts array
+      targetLayout.state = fullState;
+      targetLayout.__localRevision = ++localLayoutRevision;
+      targetLayout.stateRevision = revision;
+      skipLayoutApplyCount.value++;
+      try {
+        // ensure version tagging/migration
+        interface VersionedLayout {
+          layoutVersion?: number;
+        }
+        const vTarget = targetLayout as VersionedLayout;
+        if (!vTarget.layoutVersion) {
+          vTarget.layoutVersion = 1;
+          dlog("Applied layoutVersion=1 migration to", targetLayout.id);
+        }
+        accountStore.queueLayoutsSave();
+        dlog("Queued layout revision", revision, {
+          diffForced: !diff && !initialLayoutPersisted,
+        });
+        initialLayoutPersisted = true;
+        AUTOSAVE_DIAG.saved++;
+        AUTOSAVE_DIAG.lastDiff = true;
+        AUTOSAVE_DIAG.lastRevision = revision;
+      } catch {
+        // toast handled in store
+      }
+    }
+    // Micro-batch + debounce persistence
+    let pendingSave = false;
+    let debounceTimer: number | null = null;
+    const DEBOUNCE_MS = 600;
+    let scheduleLayoutSave = function scheduleLayoutSaveBase() {
+      if (isApplyingLayout.value) return;
+      pendingSave = true;
+      if (debounceTimer) window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(async () => {
+        if (!pendingSave) return;
+        pendingSave = false;
+        AUTOSAVE_DIAG.debounceFires++;
+        await updateCurrentLayoutInternal();
+      }, DEBOUNCE_MS);
+    };
+
+    // Expose manual trigger for debugging
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.__SAVE_LAYOUT = () => updateCurrentLayoutInternal();
+    // Allow forcing immediate persisted state (bypasses debounce) for debugging
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.__SAVE_LAYOUT_NOW = () => {
+      if (debounceTimer) {
+        window.clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+      pendingSave = false;
+      updateCurrentLayoutInternal();
+    };
+
+    // Idle flush: if no further grid events for IDLE_FLUSH_MS after a pending change, force save
+    const IDLE_FLUSH_MS = 5000;
+    let idleTimer: number | null = null;
+    function armIdleFlush() {
+      if (idleTimer) window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(() => {
+        if (pendingSave) {
+          // run immediate save
+          if (debounceTimer) {
+            window.clearTimeout(debounceTimer);
+            debounceTimer = null;
+          }
+          pendingSave = false;
+          updateCurrentLayoutInternal();
+        }
+      }, IDLE_FLUSH_MS);
+    }
+
+    // Wrap original schedule to also arm idle flush
+    const _origSchedule = scheduleLayoutSave;
+    scheduleLayoutSave = function wrappedScheduleLayoutSave() {
+      AUTOSAVE_DIAG.scheduleCalls++;
+      _origSchedule();
+      armIdleFlush();
+    };
+
+    // Flush on page visibility loss / unload (best-effort)
+    function flushIfPending() {
+      if (pendingSave) {
+        if (debounceTimer) {
+          window.clearTimeout(debounceTimer);
+          debounceTimer = null;
+        }
+        pendingSave = false;
+        updateCurrentLayoutInternal();
+      }
+    }
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") flushIfPending();
+    });
+    window.addEventListener("beforeunload", flushIfPending);
+
+    // Ensure an initial baseline save occurs shortly after grid ready if none yet persisted
+    // (In case the diff logic considered initial identical to stored state and skipped)
+    setTimeout(() => {
+      if (!initialLayoutPersisted) {
+        pendingSave = true;
+        flushIfPending();
+      }
+    }, 1500);
+    watch(
+      () => state.value,
+      () => {
+        if (skipNextLayoutApply.value) {
+          skipNextLayoutApply.value = false;
+          return;
+        }
+        AUTOSAVE_DIAG.gridEvents++;
+        scheduleLayoutSave();
+      },
+      { deep: true }
+    );
+    const lastAppliedLayoutId = ref<string | null>(null);
+    const onLayoutSelected = (layout: Layout) => {
+      refStore.setCurrentLayoutId(layout.id);
+      const cast = layout as Layout & { stateRevision?: number };
+      let layoutState: FullGridState | string = cast.state as
+        | FullGridState
+        | string;
+      try {
+        if (typeof layoutState === "string") {
+          layoutState = JSON.parse(layoutState) as FullGridState;
+        }
+      } catch (e) {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.warn("[AGgrid] Could not parse selected layout state:", e);
+        }
+        return;
+      }
+      const newRevision = cast.stateRevision || 0;
+      if (
+        lastAppliedRevision.value != null &&
+        newRevision === lastAppliedRevision.value &&
+        lastAppliedLayoutId.value === cast.id
+      ) {
+        return; // already applied this layout revision
+      }
+      isApplyingLayout.value = true;
+      setFullGridState(layoutState as FullGridState);
+      initialState.value = layoutState as FullGridState;
+      if (!gridApi.value) {
+        gridKey.value++;
+      }
+      lastAppliedRevision.value = newRevision;
+      lastAppliedLayoutId.value = cast.id;
+      setTimeout(() => (isApplyingLayout.value = false), 50);
+    };
+
     const isLoggedIn = computed(() => !!accountStore.account);
+
+    // (declarations moved earlier)
+
+    expose({ onLayoutSelected, openSaveDialog, updateCurrentLayout });
     return {
       rootStore,
       refStore,
@@ -951,7 +1259,9 @@ export default defineComponent({
       saveDialog,
       currentGridState: gridStateStore.currentState,
       openSaveDialog,
-      isLayoutApplying,
+      lastAppliedRevision,
+      isApplyingLayout,
+      isLoggedIn,
     };
   },
 });

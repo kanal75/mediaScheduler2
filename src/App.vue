@@ -28,6 +28,8 @@ export default defineComponent({
     const notificationStore = useNotificationStore();
     const { toast: toastMessage } = storeToRefs(notificationStore);
     onMounted(() => {
+      // Restore current layout selection
+      refStore.loadFromStorage?.();
       document.documentElement.classList.toggle(
         "app-dark",
         refStore.isDarkMode

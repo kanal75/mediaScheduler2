@@ -15,6 +15,8 @@ import Tooltip from "primevue/tooltip";
 // AG Grid styles (core and Quartz theme)
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
+// PrimeIcons (needed for pi-* icon classes)
+import "primeicons/primeicons.css";
 
 const app = createApp(App);
 const pinia = createPinia();

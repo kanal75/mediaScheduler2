@@ -30,6 +30,7 @@
     </Dialog>
     <MediaDialog v-if="refStore.showMediaDialog" />
     <SystemDialog />
+    <SystemEditDialog />
   </div>
 </template>
 
@@ -41,6 +42,7 @@ import NewScheduleForm from "@/components/NewSchedule/NewScheduleForm.vue";
 import NewScheduleCard from "@/components/NewSchedule/NewScheduleCard.vue";
 import MediaDialog from "@/components/NewSchedule/MediaDialog.vue";
 import SystemDialog from "@/components/NewSchedule/SystemDialog.vue";
+import SystemEditDialog from "@/components/NewSchedule/SystemEditDialog.vue";
 import Dialog from "primevue/dialog";
 import Splitter from "primevue/splitter";
 import SplitterPanel from "primevue/splitterpanel";
@@ -52,6 +54,7 @@ export default defineComponent({
     NewScheduleCard,
     MediaDialog,
     SystemDialog,
+    SystemEditDialog,
     Dialog,
     Splitter,
     SplitterPanel,

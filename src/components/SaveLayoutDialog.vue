@@ -56,6 +56,17 @@
           >Make Default Layout</label
         >
       </div>
+      <div class="p-field-checkbox" v-if="!isEditing">
+        <Checkbox
+          inputId="useDefaultTemplate"
+          v-model="useDefaultTemplate"
+          :binary="true"
+          class="input-checkbox"
+        />
+        <label for="useDefaultTemplate" class="checkbox-label"
+          >Use default template (instead of current grid)</label
+        >
+      </div>
     </div>
     <template #footer>
       <div class="dialog-footer flex items-center w-full">
@@ -119,6 +130,7 @@ export default defineComponent({
     const accountStore = useAccountStore();
     const notificationStore = useNotificationStore();
     const gridStateStore = useGridStateStore();
+    const useDefaultTemplate = ref(false);
 
     const layoutName = ref("");
     const layoutDescription = ref("");
@@ -171,10 +183,11 @@ export default defineComponent({
     const saveLayout = async () => {
       const data = props.layoutData as Layout | null;
       const layoutId = isEditing.value && data ? data.id : "";
-      // When creating a brand new layout, use the default layout state instead of inheriting current grid state
       const stateForNew = layoutId
         ? plainGridState.value
-        : JSON.parse(JSON.stringify(DEFAULT_LAYOUT_STATE));
+        : useDefaultTemplate.value
+        ? JSON.parse(JSON.stringify(DEFAULT_LAYOUT_STATE))
+        : plainGridState.value;
       const newLayout: Layout = {
         id: layoutId,
         name: layoutName.value,
@@ -223,6 +236,7 @@ export default defineComponent({
       closeDialog,
       saveLayout,
       resetDialog,
+      useDefaultTemplate,
     };
   },
 });
@@ -230,7 +244,7 @@ export default defineComponent({
 
 <style scoped>
 /* Restore layout and spacing, but do not change colors */
-.save-layout-dialog >>> .p-dialog-header {
+.save-layout-dialog :deep(.p-dialog-header) {
   border-bottom: none;
 }
 .dialog-header {

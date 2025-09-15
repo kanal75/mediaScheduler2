@@ -6,8 +6,10 @@
       @layoutSelected="handleLayoutSelected"
       @updateCurrentLayout="handleUpdateCurrentLayout"
       @openSaveDialog="handleOpenSaveDialog"
+      @saveCurrentLayout="handleUpdateCurrentLayout"
     />
     <AGgrid ref="agGridRef" />
+    <SystemEditDialog />
   </div>
 </template>
 
@@ -18,11 +20,14 @@ const LayoutPanel = defineAsyncComponent(
   () => import("@/components/LayoutPanel.vue")
 );
 const AGgrid = defineAsyncComponent(() => import("@/components/AGgrid.vue"));
+const SystemEditDialog = defineAsyncComponent(
+  () => import("@/components/NewSchedule/SystemEditDialog.vue")
+);
 import { useRootStore } from "@/store/RootStore";
 
 export default defineComponent({
   name: "DashBoard",
-  components: { AGgrid, LayoutPanel },
+  components: { AGgrid, LayoutPanel, SystemEditDialog },
   setup() {
     const showLayoutPanel = ref(false);
     type AGGridExposed = {

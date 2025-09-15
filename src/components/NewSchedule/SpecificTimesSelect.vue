@@ -31,7 +31,10 @@
                 v-for="(day, dIdx) in weekdays"
                 :key="dIdx"
                 :label="day.short"
-                :class="['weekday-btn', { selected: item.days.includes(dIdx) }]"
+                :class="[
+                  'weekday-btn',
+                  { selected: isDaySelected(item, dIdx) },
+                ]"
                 @click="toggleDay(idx, dIdx)"
                 type="button"
                 size="small"
@@ -66,7 +69,7 @@
               :disabled="item.allDay"
             />
             <Button
-              class="p-button-rounded p-button-success p-button-sm themed-action-btn"
+              class="p-button-rounded p-button-success p-button-sm"
               @click="add"
               title="Add"
             >
@@ -75,7 +78,7 @@
               </template>
             </Button>
             <Button
-              class="p-button-rounded p-button-danger p-button-sm themed-action-btn"
+              class="p-button-rounded p-button-danger p-button-sm"
               :disabled="localRanges.length === 1"
               @click="remove(idx)"
               title="Remove"
@@ -136,6 +139,16 @@ export default defineComponent({
       d.setSeconds(0);
       d.setMilliseconds(0);
       return d;
+    }
+    function isDaySelected(
+      item: { days: (number | string)[] },
+      dayIdx: number
+    ): boolean {
+      return item.days.some((d) =>
+        typeof d === "number"
+          ? d === dayIdx
+          : weekdays.findIndex((w) => w.long === d) === dayIdx
+      );
     }
     function formatTime(d: Date | null) {
       if (!d) return "";
@@ -232,6 +245,7 @@ export default defineComponent({
         )
       );
     });
+
     const timeError = computed(() => {
       if (!enabled.value) return "";
       for (const item of localRanges.value) {
@@ -262,6 +276,7 @@ export default defineComponent({
         localRanges.value.splice(idx, 1);
       }
     }
+
     watch(
       [enabled, localRanges],
       () => {
@@ -343,6 +358,7 @@ export default defineComponent({
       toggleDay,
       setAllDay,
       toggleAllWeek,
+      isDaySelected,
     };
   },
 });
@@ -420,26 +436,51 @@ export default defineComponent({
   border-radius: 4px;
   border: 1px solid var(--input-border-color, #d1d5db);
   background: var(--el-fill-color, var(--p-input-bg, inherit));
-  color: var(--el-text-color-regular, var(--p-text-color, inherit));
+  color: var(
+    --ms-btn-fg,
+    var(--el-text-color-regular, var(--p-text-color, #1f2937))
+  );
   cursor: pointer;
   font-size: 0.85rem;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-@media (prefers-color-scheme: dark) {
-  .weekday-btn {
-    border-color: var(--el-border-color, #444);
-  }
+/* Ensure PrimeVue inner label inherits the computed color in all states */
+.weekday-btn :deep(.p-button-label),
+.weekday-btn .p-button-label {
+  color: inherit !important;
 }
 .weekday-btn.selected {
-  background: var(--el-color-primary, var(--p-primary-color, #1976d2));
-  color: var(--el-color-primary-text, var(--p-primary-color-text, #fff));
-  border-color: var(--el-color-primary, var(--p-primary-color, #1976d2));
+  /* Use app-specific vars with safe defaults to avoid theme white-on-white */
+  background: var(--ms-selected-bg, #1976d2) !important;
+  color: var(--ms-selected-fg, #ffffff) !important;
+  border-color: var(--ms-selected-bg, #1976d2) !important;
+}
+.weekday-btn.selected:hover,
+.weekday-btn.selected:focus {
+  background: var(--ms-selected-bg-hover, #1e73c7) !important;
+  border-color: var(--ms-selected-bg-hover, #1e73c7) !important;
+}
+/* PrimeVue Button label should inherit */
+.weekday-btn.selected :deep(.p-button-label),
+.weekday-btn.selected .p-button-label {
+  color: inherit !important;
+}
+/* Increase specificity against PrimeVue variants */
+.weekday-btn.p-button.selected,
+.weekday-btn.p-button-text.selected,
+.weekday-btn.p-button-outlined.selected {
+  background: var(--ms-selected-bg, #1976d2) !important;
+  color: var(--ms-selected-fg, #ffffff) !important;
+  border-color: var(--ms-selected-bg, #1976d2) !important;
 }
 @media (prefers-color-scheme: dark) {
-  .weekday-btn.selected {
-    background: #1565c0 !important;
-    color: #fff !important;
-    border-color: #1565c0 !important;
+  .weekday-btn.selected,
+  .weekday-btn.p-button.selected,
+  .weekday-btn.p-button-text.selected,
+  .weekday-btn.p-button-outlined.selected {
+    background: var(--ms-selected-bg-dark, #1565c0) !important;
+    color: var(--ms-selected-fg-dark, #ffffff) !important;
+    border-color: var(--ms-selected-bg-dark, #1565c0) !important;
   }
 }
 .all-day-checkbox {
@@ -447,32 +488,6 @@ export default defineComponent({
   align-items: center;
   margin-right: 12px;
   gap: 4px;
-}
-.themed-action-btn {
-  margin-left: 4px;
-  margin-right: 4px;
-  border: 1px solid var(--input-border-color, #d1d5db);
-  background: var(--el-fill-color, var(--p-input-bg, #fff));
-  color: var(--el-text-color-regular, var(--p-text-color, #333));
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
-  height: 32px;
-  min-width: 32px;
-  font-size: 0.95rem;
-  padding: 2px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.themed-action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-@media (prefers-color-scheme: dark) {
-  .themed-action-btn {
-    border-color: var(--el-border-color, #444);
-    background: var(--el-fill-color, #222);
-    color: var(--el-text-color-regular, #fff);
-  }
 }
 @media (max-width: 600px) {
   .specific-times-row {

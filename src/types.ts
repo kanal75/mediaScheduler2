@@ -97,6 +97,7 @@ export interface Item {
   scheduleTags?: string[];
   timePicker?: string[];
   status?: string;
+  metaData?: Record<string, unknown>;
 }
 
 export interface Schedule {

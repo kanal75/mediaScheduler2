@@ -134,30 +134,22 @@ export default defineComponent({
     const newTag = ref("");
 
     const addCustomTag = async () => {
-      if (newTag.value.trim()) {
-        const customTag = newTag.value.trim();
-        const tagObj = {
-          Id: customTag,
-          BSKEY: customTag, // or generate a unique key if needed
-          bonsaiXmlDB: { addTimestamp: new Date().toISOString() },
-        };
-        // Find the "My Tags" group
-        const myTagsGroup = rootStore.scheduleTagsGroups.find(
-          (group) => group.Id === "My Tags"
-        );
-        if (myTagsGroup) {
-          await rootStore.pushTagToGroup("My Tags", tagObj);
-        } else {
-          // If 'My Tags' group doesn't exist, add it as a new group with BSKEY and push to API
-          // (Optional: implement API call to create a new group if needed)
-          rootStore.scheduleTagsGroups.push({
-            Id: "My Tags",
-            BSKEY: "My Tags",
-            Tag: [tagObj],
-          });
-        }
-        newTag.value = "";
+      if (!newTag.value.trim()) return;
+      const customTag = newTag.value.trim();
+      const tagObj = {
+        Id: customTag,
+        BSKEY: customTag,
+        bonsaiXmlDB: { addTimestamp: new Date().toISOString() },
+      };
+      await rootStore.pushTagToGroup("My Tags", tagObj);
+      // Optionally select the newly added tag in the current form
+      const currentTags = Array.isArray(rootStore.newSchedule.scheduleTags)
+        ? rootStore.newSchedule.scheduleTags
+        : [];
+      if (!currentTags.includes(customTag)) {
+        rootStore.newSchedule.scheduleTags = [...currentTags, customTag];
       }
+      newTag.value = "";
     };
 
     interface TagOption {

@@ -2,6 +2,17 @@
   <div class="button-container" :class="{ disabled: !isLoggedIn }">
     <!-- Only render buttons if params.data exists -->
     <template v-if="params.data">
+      <!-- Edit (system) button -->
+      <Button
+        v-if="isSystemRow"
+        outlined
+        class="p-button-sm action-btn edit-btn"
+        @click="onEditSystem"
+        :disabled="!isLoggedIn"
+        aria-label="Edit System"
+      >
+        <Icon name="pencil" class="icon" />
+      </Button>
       <!-- Delete button -->
       <Button
         outlined
@@ -56,6 +67,8 @@ import Icon from "@/components/icons/Icon.vue";
 import { useRootStore } from "@/store/RootStore";
 import { useNotificationStore } from "@/store/NotificationStore";
 import { useAccountStore } from "@/store/AccountStore";
+import { useRefStore } from "@/store/RefStore";
+import type { Leg } from "@/types";
 
 export default defineComponent({
   name: "ActionsCellRenderer",
@@ -67,8 +80,12 @@ export default defineComponent({
     const rootStore = useRootStore();
     const accountStore = useAccountStore();
     const notificationStore = useNotificationStore();
+    const refStore = useRefStore();
 
     const isLoggedIn = computed(() => !!accountStore.account);
+    const isSystemRow = computed(
+      () => props.params?.data?.scheduleTypes === "System"
+    );
 
     const onDelete = async () => {
       if (window.confirm("Are you sure you want to delete this item?")) {
@@ -116,6 +133,28 @@ export default defineComponent({
       });
     };
 
+    const onEditSystem = () => {
+      const row = props.params.data || {};
+      const meta = (row.metaData || {}) as Record<string, unknown>;
+      const legs = Array.isArray(meta.legs)
+        ? (meta.legs as unknown[]).map((l) => l as Leg)
+        : ([] as Leg[]);
+      const model = {
+        title: String(meta.title || ""),
+        date: String(meta.date || ""),
+        track: String(meta.track || ""),
+        betType: String(meta.betType || ""),
+        legs,
+        path: String((meta.path as unknown) || ""),
+        location: String((meta.location as unknown) || ""),
+      };
+      refStore.openSystemEdit(model, {
+        id: row.id,
+        profile: row.profile,
+        scheduleTypes: row.scheduleTypes,
+      });
+    };
+
     // Pause the schedule by setting its status to 'Paused'
     const onPause = async () => {
       const schedule = props.params.data;
@@ -150,6 +189,8 @@ export default defineComponent({
       onResume,
       rootStore,
       isLoggedIn,
+      isSystemRow,
+      onEditSystem,
     };
   },
 });
@@ -184,6 +225,9 @@ export default defineComponent({
 }
 .pause-btn .icon {
   color: #0288d1; /* info (blue) */
+}
+.edit-btn .icon {
+  color: #90caf9; /* light blue */
 }
 
 .icon {
