@@ -111,24 +111,7 @@
               </span>
             </div>
             <div class="actions">
-              <Button
-                icon="pi pi-save"
-                rounded
-                variant="outlined"
-                size="small"
-                class="action-btn"
-                :pt="{ root: { title: 'Save This Layout' } }"
-                @click.stop="saveLayoutState(layout)"
-              />
-              <Button
-                icon="pi pi-refresh"
-                rounded
-                variant="outlined"
-                size="small"
-                class="action-btn"
-                :pt="{ root: { title: 'Reset Layout (Default Grid)' } }"
-                @click.stop="resetLayout(layout)"
-              />
+              <!-- Default star moved to first position -->
               <Button
                 v-if="!layout.isDefault"
                 icon="pi pi-star"
@@ -148,6 +131,24 @@
                 class="action-btn star-btn active"
                 @click.stop="toggleStar(layout)"
                 :pt="{ root: { title: 'Default' } }"
+              />
+              <Button
+                icon="pi pi-save"
+                rounded
+                variant="outlined"
+                size="small"
+                class="action-btn"
+                :pt="{ root: { title: 'Save This Layout' } }"
+                @click.stop="saveLayoutState(layout)"
+              />
+              <Button
+                icon="pi pi-refresh"
+                rounded
+                variant="outlined"
+                size="small"
+                class="action-btn"
+                :pt="{ root: { title: 'Reset Layout (Default Grid)' } }"
+                @click.stop="resetLayout(layout)"
               />
               <Button
                 icon="pi pi-copy"

@@ -160,6 +160,15 @@ export default defineComponent({
       const end = new Date(now.getTime() + 60 * 60 * 1000);
       return { days: [0], range: [now, end] as [Date, Date], allDay: false };
     }
+    function isFullDayDates(from: Date | null, to: Date | null) {
+      if (!from || !to) return false;
+      return (
+        from.getHours() === 0 &&
+        from.getMinutes() === 0 &&
+        to.getHours() === 23 &&
+        to.getMinutes() === 59
+      );
+    }
 
     const initialEnabled = !!props.params.data.specificTime;
     const initialRanges: SpecificTimeRange[] =
@@ -170,7 +179,7 @@ export default defineComponent({
               return {
                 days: [0],
                 range: [parseTime(r[0]), parseTime(r[1])] as [Date, Date],
-                allDay: false,
+                allDay: isFullDayDates(parseTime(r[0]), parseTime(r[1])),
               };
             }
             if (
@@ -194,7 +203,7 @@ export default defineComponent({
                     )
                   : [0],
                 range: [parseTime(obj.from), parseTime(obj.to)] as [Date, Date],
-                allDay: obj.allDay || false,
+                allDay: isFullDayDates(parseTime(obj.from), parseTime(obj.to)),
               };
             }
             return getDefaultRange();
@@ -211,7 +220,6 @@ export default defineComponent({
         ),
         from: formatTime(item.range[0]),
         to: formatTime(item.range[1]),
-        allDay: item.allDay || false,
       }))
     );
 

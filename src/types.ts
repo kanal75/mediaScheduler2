@@ -54,7 +54,6 @@ export interface NewSchedule {
     days: string[];
     from: string;
     to: string;
-    allDay?: boolean;
   }>;
   scheduleTags?: string[];
   metaData: SystemFormModel & { [key: string]: any };

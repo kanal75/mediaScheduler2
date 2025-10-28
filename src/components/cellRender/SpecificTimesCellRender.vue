@@ -1,5 +1,9 @@
 <template>
-  <div class="specific-times-cell">
+  <div
+    class="specific-times-cell"
+    aria-label="Full specific times list"
+    :title="tooltipText"
+  >
     <template v-if="normalizedRanges.length">
       <div
         v-for="(r, index) in normalizedRanges"
@@ -42,6 +46,7 @@ import { defineComponent, computed, PropType } from "vue";
 import Icon from "@/components/icons/Icon.vue";
 import dayjs from "dayjs";
 import Tag from "primevue/tag";
+// OverlayPanel removed per request; using native title tooltip instead
 
 // Types covering both legacy and new formats
 type SpecificTimesObject = {
@@ -106,6 +111,12 @@ function formatMaybeTime(val?: string): string {
   return val;
 }
 
+function isFullDayFromTo(from?: string, to?: string): boolean {
+  const f = formatMaybeTime(from);
+  const t = formatMaybeTime(to);
+  return f === "00:00" && t === "23:59";
+}
+
 function parseMaybeJSON(input: unknown): unknown {
   if (typeof input === "string") {
     try {
@@ -124,6 +135,7 @@ export default defineComponent({
     params: { type: Object as PropType<CellParams>, required: true },
   },
   setup(props) {
+    // No overlay: keep only computed values
     const rowSpecificTimes = computed<CellValue>(() => {
       const st = parseMaybeJSON(props.params?.data?.specificTimes);
       return (st ?? []) as CellValue;
@@ -159,7 +171,7 @@ export default defineComponent({
               daysLabels: toShortDayLabels(r.days),
               from: formatMaybeTime(typeof r.from === "string" ? r.from : ""),
               to: formatMaybeTime(typeof r.to === "string" ? r.to : ""),
-              allDay: !!r.allDay,
+              allDay: isFullDayFromTo(r.from, r.to),
             });
           }
         }
@@ -178,7 +190,7 @@ export default defineComponent({
               daysLabels: [],
               from: formatMaybeTime(arr[0] || ""),
               to: formatMaybeTime(arr[1] || ""),
-              allDay: false,
+              allDay: isFullDayFromTo(arr[0], arr[1]),
             });
           }
         }
@@ -196,7 +208,7 @@ export default defineComponent({
           daysLabels: [],
           from: formatMaybeTime(vv[0] || ""),
           to: formatMaybeTime(vv[1] || ""),
-          allDay: false,
+          allDay: isFullDayFromTo(vv[0], vv[1]),
         });
         return out;
       }
@@ -209,7 +221,7 @@ export default defineComponent({
             daysLabels: toShortDayLabels(v.days),
             from: formatMaybeTime(v.from || ""),
             to: formatMaybeTime(v.to || ""),
-            allDay: !!v.allDay,
+            allDay: isFullDayFromTo(v.from, v.to),
           });
           return out;
         }
@@ -218,7 +230,32 @@ export default defineComponent({
       return out;
     });
 
-    return { normalizedRanges };
+    const tooltipText = computed(() => {
+      const list = normalizedRanges.value;
+      if (!list || !list.length) return "";
+      return list
+        .map((r) => {
+          const timePart = r.allDay
+            ? "All Day"
+            : [r.from, r.to]
+                .filter((v) => v && String(v).trim().length)
+                .join(" - ");
+          let daysPart = "";
+          if (Array.isArray(r.daysLabels) && r.daysLabels.length) {
+            daysPart =
+              r.daysLabels.length === 7
+                ? " (All week)"
+                : ` (${r.daysLabels.join(", ")})`;
+          }
+          return `${timePart}${daysPart}`;
+        })
+        .join("\n");
+    });
+
+    return {
+      normalizedRanges,
+      tooltipText,
+    };
   },
 });
 </script>
@@ -227,7 +264,7 @@ export default defineComponent({
 .specific-times-cell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px; /* more space between in-cell rows */
   /* ensure left alignment inside AG Grid cells */
   align-items: flex-start;
   text-align: left;
@@ -237,11 +274,11 @@ export default defineComponent({
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px; /* more space between tags within a row */
   justify-content: flex-start;
 }
 .mr-1 {
-  margin-right: 6px;
+  margin-right: 8px; /* more breathing room between adjacent tags */
 }
 .arrow {
   opacity: 0.7;
@@ -263,6 +300,7 @@ export default defineComponent({
 .days-group {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px; /* more space between day chips */
 }
+/* Overlay card removed; no related styles needed */
 </style>

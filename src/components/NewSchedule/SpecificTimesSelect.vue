@@ -159,7 +159,21 @@ export default defineComponent({
     function getDefaultRange() {
       const now = new Date();
       const end = new Date(now.getTime() + 60 * 60 * 1000);
-      return { days: [0], range: [now, end] as [Date, Date], allDay: false };
+      // Default to All Week selected (0..6)
+      return {
+        days: weekdays.map((_, i) => i),
+        range: [now, end] as [Date, Date],
+        allDay: false,
+      };
+    }
+    function isFullDayDates(from: Date | null, to: Date | null) {
+      if (!from || !to) return false;
+      return (
+        from.getHours() === 0 &&
+        from.getMinutes() === 0 &&
+        to.getHours() === 23 &&
+        to.getMinutes() === 59
+      );
     }
 
     const initialEnabled = ref(!!rootStore.newSchedule.specificTime);
@@ -168,9 +182,10 @@ export default defineComponent({
         rootStore.newSchedule.specificTimes.length
         ? rootStore.newSchedule.specificTimes.map((r: SpecificTimeRange) => {
             return {
-              days: Array.isArray(r.days) ? r.days : [1],
+              // If days missing in incoming data, default to All Week
+              days: Array.isArray(r.days) ? r.days : weekdays.map((_, i) => i),
               range: [parseTime(r.from), parseTime(r.to)] as [Date, Date],
-              allDay: r.allDay || false,
+              allDay: isFullDayDates(parseTime(r.from), parseTime(r.to)),
             };
           })
         : [getDefaultRange()]
@@ -183,7 +198,7 @@ export default defineComponent({
         ? initialRanges.value.map((r) => ({
             days: r.days,
             range: [r.range[0], r.range[1]] as [Date, Date],
-            allDay: r.allDay || false,
+            allDay: isFullDayDates(r.range[0], r.range[1]),
           }))
         : [getDefaultRange()]
     );
@@ -288,7 +303,6 @@ export default defineComponent({
                 ),
                 from: formatTime(item.range[0]),
                 to: formatTime(item.range[1]),
-                allDay: item.allDay || false,
               }))
               .filter((item) => item.days.length && item.from && item.to)
           : [];
@@ -313,7 +327,6 @@ export default defineComponent({
             ),
             from: formatTime(item.range[0]),
             to: formatTime(item.range[1]),
-            allDay: item.allDay || false,
           }))
           .filter((item) => item.days.length && item.from && item.to);
         if (!isEqual(newVal, localTimes)) {
@@ -333,11 +346,11 @@ export default defineComponent({
                           : day
                       )
                       .filter((idx) => idx !== -1)
-                  : [1];
+                  : weekdays.map((_, i) => i);
                 return {
                   days: dayIndices,
                   range: [parseTime(r.from), parseTime(r.to)] as [Date, Date],
-                  allDay: r.allDay || false,
+                  allDay: isFullDayDates(parseTime(r.from), parseTime(r.to)),
                 };
               })
               .filter((item) => item.range[0] && item.range[1]);
