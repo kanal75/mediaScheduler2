@@ -30,6 +30,7 @@
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useRootStore } from "@/store/RootStore";
+import { useMediaStore } from "@/store/MediaStore";
 import type { TreeNode } from "primevue/treenode";
 import Toast from "primevue/toast";
 import Tree from "primevue/tree";
@@ -39,6 +40,7 @@ export default defineComponent({
   components: { Toast, Tree },
   setup() {
     const rootStore = useRootStore();
+    const mediaStore = useMediaStore();
     const isTreeLoading = ref(true);
     const selectedKey = ref<Record<string, boolean> | undefined>(undefined);
 
@@ -250,7 +252,7 @@ export default defineComponent({
         const node = findNodeByKey(nodes.value, key);
         if (node) {
           if (node.leaf && node.data?.rawFile) {
-            rootStore.setSelectedFile(node.data.rawFile);
+            mediaStore.previewFileSelection(node.data.rawFile);
             // Also set the folder to the parent folder if available
             if (node.key && node.key.includes("_")) {
               const parentKey = node.key.substring(
@@ -259,29 +261,29 @@ export default defineComponent({
               );
               const parentNode = findNodeByKey(nodes.value, parentKey);
               if (parentNode) {
-                rootStore.setSelectedFolder(parentNode.data?.rawFolder ?? null);
+                mediaStore.focusFolder(parentNode.data?.rawFolder ?? null);
               } else {
-                rootStore.setSelectedFolder(null);
+                mediaStore.focusFolder(null);
               }
             } else {
-              rootStore.setSelectedFolder(null);
+              mediaStore.focusFolder(null);
             }
           } else {
             // Set the selected folder to the node's rawFolder
-            rootStore.setSelectedFolder(node.data?.rawFolder ?? null);
-            rootStore.setSelectedFile(null);
+            mediaStore.focusFolder(node.data?.rawFolder ?? null);
+            mediaStore.clearPreview();
           }
         } else {
           if (process.env.NODE_ENV !== "production") {
             // eslint-disable-next-line no-console
             console.log("Node not found for key:", key);
           }
-          rootStore.setSelectedFile(null);
-          rootStore.setSelectedFolder(null);
+          mediaStore.clearPreview();
+          mediaStore.focusFolder(null);
         }
       } else {
-        rootStore.setSelectedFile(null);
-        rootStore.setSelectedFolder(null);
+        mediaStore.clearPreview();
+        mediaStore.focusFolder(null);
       }
     });
 
@@ -296,8 +298,8 @@ export default defineComponent({
         if (scheduleType === "system") return;
         // Clear selection to let MediaDialog/MediaGallery choose a sensible default
         selectedKey.value = undefined;
-        rootStore.setSelectedFile(null);
-        rootStore.setSelectedFolder(null);
+        mediaStore.clearPreview();
+        mediaStore.focusFolder(null);
         const autoSelectScheduleTypes = computed(() => rootStore.scheduleTypes);
         if (
           newNodes &&

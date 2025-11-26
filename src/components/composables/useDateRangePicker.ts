@@ -1,4 +1,8 @@
 import { ref, computed, watch } from "vue";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+dayjs.extend(customParseFormat);
 
 export function useDateRangePicker(options: {
   initialRange?: string[] | Date[] | null;
@@ -10,16 +14,23 @@ export function useDateRangePicker(options: {
   const showPrompt = ref(false);
   const promptWord = ref("");
   const localRange = ref<Date[] | null>(null);
+  const manualStart = ref("");
+  const manualEnd = ref("");
+  const manualErrors = ref({ start: false, end: false });
 
-  // Restore any previously‑saved range
-  if (
-    Array.isArray(options.initialRange) &&
-    options.initialRange.length === 2
-  ) {
-    localRange.value = (options.initialRange as (string | Date)[]).map((s) =>
-      s instanceof Date ? s : new Date(String(s).replace(" ", "T"))
-    );
+  // Helper to apply an external range (string[] or Date[]) to local state
+  function applyInitialRange(range?: string[] | Date[] | null) {
+    if (Array.isArray(range) && range.length === 2) {
+      localRange.value = (range as (string | Date)[]).map((s) =>
+        s instanceof Date ? s : new Date(String(s).replace(" ", "T"))
+      );
+      syncManualFields();
+      manualErrors.value = { start: false, end: false };
+    }
   }
+
+  // Restore any previously‑saved range once on init
+  applyInitialRange(options.initialRange ?? null);
 
   const isComplete = computed(
     () =>
@@ -110,6 +121,97 @@ export function useDateRangePicker(options: {
     return `${Y}-${M}-${D} ${h}:${m}`;
   }
 
+  function syncManualFields() {
+    manualStart.value = localRange.value?.[0]
+      ? formatDate(localRange.value[0])
+      : "";
+    manualEnd.value = localRange.value?.[1]
+      ? formatDate(localRange.value[1])
+      : "";
+  }
+
+  watch(
+    () => localRange.value && localRange.value.map((d) => d?.getTime()),
+    () => {
+      syncManualFields();
+      manualErrors.value = { start: false, end: false };
+    },
+    { immediate: true }
+  );
+
+  function parseManualValue(value: string): Date | null {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const parsed = dayjs(trimmed, "YYYY-MM-DD HH:mm", true);
+    return parsed.isValid() ? parsed.toDate() : null;
+  }
+
+  function emitRange(range: Date[] | null) {
+    if (range && range.length === 2 && range[0] && range[1]) {
+      const formatted = [formatDate(range[0]), formatDate(range[1])];
+      options.onChange?.(formatted);
+    } else {
+      options.onChange?.([]);
+    }
+  }
+
+  function updateManualSegment(part: "start" | "end") {
+    const value = part === "start" ? manualStart.value : manualEnd.value;
+    const trimmed = value.trim();
+    const parsed = parseManualValue(value);
+    manualErrors.value = {
+      ...manualErrors.value,
+      [part]: Boolean(trimmed) && !parsed,
+    };
+
+    if (!trimmed) {
+      // Clearing input removes that segment
+      const current: Array<Date | undefined> = localRange.value
+        ? [...localRange.value]
+        : [];
+      current[part === "start" ? 0 : 1] = undefined;
+      const filtered = current.filter((d): d is Date => d instanceof Date);
+      localRange.value = filtered.length ? filtered : null;
+      emitRange(localRange.value);
+      return;
+    }
+
+    if (!parsed) {
+      return;
+    }
+
+    const currentStart = localRange.value?.[0] ?? null;
+    const currentEnd = localRange.value?.[1] ?? null;
+    const nextStart = part === "start" ? parsed : currentStart;
+    const nextEnd = part === "end" ? parsed : currentEnd;
+
+    if (nextStart && nextEnd && nextStart.getTime() > nextEnd.getTime()) {
+      manualErrors.value = {
+        start: part === "end",
+        end: part === "start",
+      };
+      return;
+    }
+
+    const nextRange: Date[] = [];
+    if (nextStart) {
+      nextRange[0] = nextStart;
+    }
+    if (nextEnd) {
+      nextRange[1] = nextEnd;
+    }
+    localRange.value = nextRange.length ? nextRange : null;
+    manualErrors.value = { start: false, end: false };
+    emitRange(localRange.value);
+  }
+
+  function selectAllText(event: Event) {
+    const input = event.target as HTMLInputElement | null;
+    input?.select?.();
+  }
+
   function confirm(event: MouseEvent) {
     event.preventDefault();
     attempted.value = true;
@@ -148,12 +250,7 @@ export function useDateRangePicker(options: {
       arr = null;
     }
     localRange.value = arr;
-    if (arr && arr.length === 2 && arr[0] && arr[1]) {
-      const formatted = [formatDate(arr[0]), formatDate(arr[1])];
-      options.onChange?.(formatted);
-    } else {
-      options.onChange?.([]);
-    }
+    emitRange(arr);
   }
 
   return {
@@ -168,5 +265,10 @@ export function useDateRangePicker(options: {
     confirm,
     onShow,
     onDateChange,
+    manualStart,
+    manualEnd,
+    manualErrors,
+    updateManualSegment,
+    selectAllText,
   };
 }

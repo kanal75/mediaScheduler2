@@ -6,11 +6,6 @@
         id="profile"
         v-model="rootStore.newSchedule.profile"
         :options="profiles"
-        @change="
-          (rootStore.newSchedule.scheduleTypes = ''),
-            (rootStore.selectedFile = null),
-            (rootStore.selectedFolder = null)
-        "
         class="w-full"
       />
     </div>
@@ -24,8 +19,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, watch } from "vue";
 import { useRootStore } from "@/store/RootStore";
+import { useMediaStore } from "@/store/MediaStore";
 import SelectButton from "primevue/selectbutton";
 
 export default defineComponent({
@@ -39,7 +35,21 @@ export default defineComponent({
   },
   setup(props) {
     const rootStore = useRootStore();
+    const mediaStore = useMediaStore();
     const profiles = computed(() => rootStore.profiles);
+    // Only clear schedule type / selected media when the profile actually
+    // changes. PrimeVue's SelectButton can emit change events even if the
+    // underlying model doesn't change in some interactions, so using a
+    // watch with old/new comparison avoids accidental clears.
+    watch(
+      () => rootStore.newSchedule.profile,
+      (newVal: string, oldVal: string) => {
+        if (newVal && oldVal && newVal !== oldVal) {
+          rootStore.newSchedule.scheduleTypes = "";
+          mediaStore.resetAll();
+        }
+      }
+    );
     return {
       rootStore,
       profiles,
@@ -69,8 +79,9 @@ export default defineComponent({
   display: flex;
   align-items: center;
   padding: 0 1rem;
-  color: var(--input-group-addon-color, var(--el-text-color-regular, #ffffff));
-  font-weight: 500;
+  color: inherit;
+  background-color: transparent;
+  font-weight: inherit;
   border-right: 1px solid var(--input-border-color, #d1d5db);
   min-width: 120px;
 }

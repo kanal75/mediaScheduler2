@@ -1,45 +1,94 @@
 <template>
   <div class="p-field">
-    <div class="custom-input-group">
-      <span class="custom-input-group-addon">Date</span>
-      <DatePicker
-        ref="dp"
-        v-model="localRange"
-        selectionMode="range"
-        showTime
-        :closeOnDateSelect="false"
-        class="w-full"
-        dateFormat="yy-mm-dd"
-        showIcon
-        placeholder="Select Date"
-        @show="onShow"
-        @update:modelValue="onDateChange"
-      >
-        <template #footer>
-          <div v-if="showPrompt" class="prompt">
-            Please choose the <strong>{{ promptWord }}</strong
-            >.
-          </div>
-          <div class="p-datepicker-buttonbar">
-            <Button
-              class="p-button-text p-button-sm"
-              @click="clear"
-              label="Clear"
-            />
-            <Button
-              class="p-button-text p-button-sm today-btn"
-              @click="today"
-              label="Today"
-            />
-            <Button
-              class="p-button-text p-button-sm"
-              :disabled="!isComplete"
-              @click="confirm($event)"
-              label="OK"
+    <div class="manual-inline-row">
+      <div class="manual-tile">
+        <div class="custom-input-group manual-group">
+          <span class="custom-input-group-addon">Start</span>
+          <div class="manual-input-shell">
+            <InputMask
+              v-model="manualStart"
+              mask="9999-99-99 99:99"
+              placeholder="YYYY-MM-DD HH:MM"
+              class="manual-date-input"
+              @focus="onStartFocus"
+              @keyup="onStartKeyup"
+              @complete="onStartComplete"
+              @blur="onStartBlur"
             />
           </div>
-        </template>
-      </DatePicker>
+        </div>
+        <small v-if="manualErrors.start" class="p-error mt-1 block">
+          Invalid start date or start is after end (YYYY-MM-DD HH:MM)
+        </small>
+      </div>
+      <div class="manual-tile">
+        <div class="custom-input-group manual-group">
+          <span class="custom-input-group-addon">End</span>
+          <div class="manual-input-shell" ref="endInputShellRef">
+            <InputMask
+              v-model="manualEnd"
+              mask="9999-99-99 99:99"
+              placeholder="YYYY-MM-DD HH:MM"
+              class="manual-date-input"
+              @focus="selectAllText"
+              @complete="() => updateManualSegment('end')"
+              @blur="() => updateManualSegment('end')"
+            />
+          </div>
+        </div>
+        <small v-if="manualErrors.end" class="p-error mt-1 block">
+          Invalid end date or end is before start (YYYY-MM-DD HH:MM)
+        </small>
+      </div>
+      <div class="manual-calendar-container">
+        <button
+          type="button"
+          class="manual-calendar-tile"
+          @click="openCalendar"
+          @keydown.enter.prevent="openCalendar"
+          @keydown.space.prevent="openCalendar"
+        >
+          <i class="pi pi-calendar" />
+        </button>
+        <DatePicker
+          ref="dp"
+          v-model="localRange"
+          selectionMode="range"
+          showTime
+          :closeOnDateSelect="false"
+          class="hidden-date-picker"
+          dateFormat="yy-mm-dd"
+          showIcon
+          placeholder="Select Date"
+          @show="onShow"
+          @update:modelValue="onDateChange"
+        >
+          <template #footer>
+            <div v-if="showPrompt" class="prompt">
+              Please choose the <strong>{{ promptWord }}</strong
+              >.
+            </div>
+            <div class="p-datepicker-buttonbar">
+              <Button
+                class="p-button-text p-button-sm"
+                @click="clear"
+                label="Clear"
+              />
+              <Button
+                class="p-button-text p-button-sm today-btn"
+                @click="today"
+                label="Today"
+              />
+              <Button
+                class="p-button-text p-button-sm"
+                :disabled="!isComplete"
+                @click="confirm($event)"
+                label="OK"
+              />
+            </div>
+          </template>
+        </DatePicker>
+      </div>
     </div>
     <div
       v-if="
@@ -61,14 +110,15 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, nextTick, ref, watch } from "vue";
 import { useRootStore } from "@/store/RootStore";
 import { useDateRangePicker } from "@/components/composables/useDateRangePicker";
 import DatePicker from "primevue/datepicker";
+import InputMask from "primevue/inputmask";
 
 export default defineComponent({
   name: "DateRangePickerSelect",
-  components: { DatePicker },
+  components: { DatePicker, InputMask },
   props: {
     attemptedSubmit: {
       type: Boolean,
@@ -89,12 +139,92 @@ export default defineComponent({
       confirm,
       onShow,
       onDateChange,
+      manualStart,
+      manualEnd,
+      manualErrors,
+      updateManualSegment,
+      selectAllText,
     } = useDateRangePicker({
       initialRange: rootStore.newSchedule.timePicker,
       onChange: (range: string[]) => {
         rootStore.newSchedule.timePicker = range;
       },
     });
+
+    // Keep picker in sync when newSchedule.timePicker is replaced externally (e.g. by speech)
+    watch(
+      () => rootStore.newSchedule.timePicker,
+      (range) => {
+        if (Array.isArray(range) && range.length === 2) {
+          localRange.value = range.map(
+            (s) => new Date(String(s).replace(" ", "T"))
+          );
+        }
+      }
+    );
+
+    const endInputShellRef = ref<HTMLElement | null>(null);
+    const startFieldActive = ref(false);
+    const maskComplete = (value?: string | null) =>
+      typeof value === "string" &&
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value.trim());
+    const queueEndFocus = () => {
+      nextTick(() => {
+        if (typeof window !== "undefined" && window.requestAnimationFrame) {
+          window.requestAnimationFrame(() => focusEndInput());
+        } else {
+          setTimeout(focusEndInput, 0);
+        }
+      });
+    };
+    const focusEndInput = () => {
+      const input = endInputShellRef.value?.querySelector("input");
+      if (!input) return;
+      input.focus();
+      input.select();
+    };
+
+    const onStartComplete = () => {
+      updateManualSegment("start");
+      queueEndFocus();
+    };
+
+    const onStartKeyup = () => {
+      if (maskComplete(manualStart.value)) {
+        queueEndFocus();
+      }
+    };
+
+    const onStartFocus = (event: Event) => {
+      startFieldActive.value = true;
+      selectAllText(event);
+    };
+
+    const onStartBlur = () => {
+      startFieldActive.value = false;
+      updateManualSegment("start");
+    };
+
+    watch(manualStart, (value) => {
+      if (!startFieldActive.value) return;
+      if (maskComplete(value)) {
+        queueEndFocus();
+      }
+    });
+
+    const openCalendar = (event?: MouseEvent | KeyboardEvent) => {
+      const picker = dp.value as
+        | { showOverlay?: () => void; overlayVisible?: boolean }
+        | null
+        | undefined;
+      if (!picker) return;
+      if (typeof picker.showOverlay === "function") {
+        picker.showOverlay();
+      } else {
+        picker.overlayVisible = true;
+      }
+      event?.stopPropagation?.();
+    };
 
     expose({ clear });
 
@@ -110,8 +240,20 @@ export default defineComponent({
       confirm,
       onShow,
       onDateChange,
+      manualStart,
+      manualEnd,
+      manualErrors,
+      updateManualSegment,
+      selectAllText,
+      onStartFocus,
+      onStartBlur,
+      openCalendar,
       rootStore,
       props,
+      endInputShellRef,
+      focusEndInput,
+      onStartComplete,
+      onStartKeyup,
     };
   },
 });
@@ -158,8 +300,9 @@ export default defineComponent({
   display: flex;
   align-items: center;
   padding: 0 1rem;
-  color: var(--input-group-addon-color, var(--el-text-color-regular, #ffffff));
-  font-weight: 500;
+  color: inherit;
+  background-color: transparent;
+  font-weight: inherit;
   border-right: 1px solid var(--input-border-color, #d1d5db);
   min-width: 120px;
 }
@@ -182,5 +325,78 @@ export default defineComponent({
 .p-inputswitch {
   min-height: 52px;
   box-sizing: border-box;
+}
+.manual-inline-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(64px, auto);
+  align-items: stretch;
+  gap: 0.9rem;
+  margin-top: 0.85rem;
+  width: 100%;
+}
+.manual-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.manual-group {
+  min-height: 52px;
+}
+.manual-input-shell {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  background: transparent;
+}
+.manual-date-input {
+  flex: 1 1 auto;
+  border: none;
+  background: transparent;
+  padding: 0 0.75rem;
+}
+.manual-date-input:focus-within,
+.manual-date-input input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.manual-calendar-tile {
+  min-width: 52px;
+  height: 52px;
+  border: 1px solid var(--input-border-color, #d1d5db);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.manual-calendar-tile:hover {
+  color: #fff;
+  border-color: #fff;
+}
+.manual-calendar-tile:focus-visible {
+  outline: 2px solid var(--primary-color, #3b82f6);
+  outline-offset: 2px;
+}
+.manual-calendar-tile i {
+  font-size: 1.1rem;
+}
+.manual-calendar-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hidden-date-picker {
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 768px) {
+  .manual-inline-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

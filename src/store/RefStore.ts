@@ -10,6 +10,8 @@ export const useRefStore = defineStore("RefStore", {
     showAccountPanel: false,
     showNewScheduleDialog: false,
     showMediaDialog: false,
+    mediaDialogDismissed: false,
+    loadingMedia: false,
     showSaveLayoutDialog: false,
     showSystemDialog: false, // Always true for now to show the dialog directly
     showSystemEditDialog: false,

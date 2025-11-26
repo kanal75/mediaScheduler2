@@ -402,8 +402,9 @@ export default defineComponent({
   display: flex;
   align-items: center;
   padding: 0 1rem;
-  color: var(--input-group-addon-color, var(--el-text-color-regular, #ffffff));
-  font-weight: 500;
+  color: inherit;
+  background-color: transparent;
+  font-weight: inherit;
   border-right: 1px solid var(--input-border-color, #d1d5db);
   min-width: 120px;
 }

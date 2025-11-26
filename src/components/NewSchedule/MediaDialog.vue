@@ -1,8 +1,8 @@
 <template>
   <div class="card flex justify-center">
     <Dialog
-      v-model:visible="refStore.showMediaDialog"
-      header="Add New Schedule"
+      v-model:visible="internalVisible"
+      :header="rootStore.treeData === null ? 'Loading media…' : 'Select Media'"
       :style="{ width: '80vw' }"
       contentStyle="height: 80vh; overflow: hidden;"
       :baseZIndex="10000"
@@ -70,6 +70,11 @@
 import { defineComponent, computed, watch } from "vue";
 import { useRefStore } from "@/store/RefStore";
 import { useRootStore } from "@/store/RootStore";
+import {
+  useMediaStore,
+  type MediaFile,
+  type MediaFolder,
+} from "@/store/MediaStore";
 import MediaTree from "@/components/NewSchedule/MediaTree.vue";
 import MediaGallery from "@/components/NewSchedule/MediaGallery.vue";
 import Dialog from "primevue/dialog";
@@ -80,6 +85,13 @@ import Icon from "@/components/icons/Icon.vue";
 
 export default defineComponent({
   name: "MediaDialog",
+  props: {
+    visible: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  emits: ["update:visible", "file-selected", "cancelled"],
   components: {
     MediaTree,
     MediaGallery,
@@ -89,27 +101,44 @@ export default defineComponent({
     Button,
     Icon,
   },
-  setup() {
+  setup(props, { emit }) {
     const refStore = useRefStore();
     const rootStore = useRootStore();
+    const mediaStore = useMediaStore();
 
-    const isFileSelected = computed(() => !!rootStore.selectedFile);
+    const internalVisible = computed({
+      get: () => props.visible,
+      set: (v: boolean) => emit("update:visible", v),
+    });
+
+    const isFileSelected = computed(() => !!mediaStore.selectedFile);
 
     const addToMetaData = () => {
-      if (rootStore.selectedFile) {
-        rootStore.newSchedule.metaData = rootStore.selectedFile.Data || {};
-        refStore.showMediaDialog = false;
-      }
+      const file = mediaStore.selectedFile as MediaFile | null;
+      if (!file) return;
+      rootStore.newSchedule.metaData =
+        (file.Data as typeof rootStore.newSchedule.metaData | undefined) ||
+        rootStore.newSchedule.metaData;
+      // User selected a file — clear dismissed state and close dialog.
+      refStore.mediaDialogDismissed = false;
+      emit("file-selected", file);
+      emit("update:visible", false);
     };
 
     const closeDialog = () => {
-      refStore.showMediaDialog = false;
-      rootStore.resetNewSchedule();
-      rootStore.selectedFile = null;
+      // User explicitly closed/cancelled the media dialog — remember that so
+      // we don't auto-reopen it until the user changes profile/type.
+      emit("update:visible", false);
+      refStore.mediaDialogDismissed = true;
+      emit("cancelled");
+      // Keep the newSchedule model as-is (don't reset everything) so the
+      // user's form entries (profile/type) remain. But clear selectedFile so
+      // the gallery doesn't show a single-file view.
+      mediaStore.clearSelection();
     };
 
     const resetMedia = () => {
-      rootStore.selectedFile = null;
+      mediaStore.clearSelection();
     };
 
     const refreshTree = async () => {
@@ -118,14 +147,17 @@ export default defineComponent({
     };
 
     const onDialogClose = () => {
-      refStore.showMediaDialog = false;
-      rootStore.resetNewSchedule();
+      emit("update:visible", false);
+      refStore.mediaDialogDismissed = true;
+      // Keep the schedule model intact; user chose to close.
+      mediaStore.clearPreview();
     };
 
     const onDialogVisibleChange = (visible: boolean) => {
       if (!visible) {
         refStore.showMediaDialog = false;
-        rootStore.resetNewSchedule();
+        refStore.mediaDialogDismissed = true;
+        mediaStore.clearPreview();
       }
     };
 
@@ -158,16 +190,19 @@ export default defineComponent({
     }
 
     watch(
-      () => refStore.showMediaDialog,
+      () => props.visible,
       async (open) => {
         if (open) {
+          mediaStore.clearPreview();
           if (!rootStore.treeData) {
             await rootStore.fetchTreeData();
           }
-          if (!rootStore.selectedFolder && rootStore.treeData) {
+          if (!mediaStore.focusedFolder && rootStore.treeData) {
             const first = findFirstFolderWithFiles(rootStore.treeData);
-            if (first) rootStore.setSelectedFolder(first);
+            if (first) mediaStore.focusFolder(first as MediaFolder);
           }
+        } else {
+          mediaStore.clearPreview();
         }
       }
     );
@@ -175,6 +210,7 @@ export default defineComponent({
     return {
       refStore,
       rootStore,
+      internalVisible,
       isFileSelected,
       addToMetaData,
       closeDialog,

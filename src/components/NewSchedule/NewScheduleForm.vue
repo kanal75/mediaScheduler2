@@ -179,21 +179,7 @@ export default defineComponent({
       dateRangePickerRef.value?.clear();
     };
 
-    watch(
-      () => rootStore.newSchedule.scheduleTypes,
-      (newVal, oldVal) => {
-        if (oldVal === "" && newVal && newVal !== "") {
-          if (newVal === "System") {
-            refStore.showSystemDialog = true;
-            refStore.showMediaDialog = false;
-          } else {
-            refStore.showMediaDialog = true;
-            refStore.showSystemDialog = false;
-          }
-        }
-        // Do not show dialog again on deselect
-      }
-    );
+    // NewScheduleDialog is now responsible for opening/closing media/system dialogs.
 
     return {
       refStore,

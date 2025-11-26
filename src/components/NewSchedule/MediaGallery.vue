@@ -60,6 +60,11 @@
 import { defineComponent, computed, ref, watch, onMounted } from "vue";
 import { useRootStore } from "@/store/RootStore";
 import { useRefStore } from "@/store/RefStore";
+import {
+  useMediaStore,
+  type MediaFile,
+  type MediaFolder,
+} from "@/store/MediaStore";
 import Card from "primevue/card";
 import ProgressSpinner from "primevue/progressspinner";
 import fallbackLogo from "@/assets/logo.png";
@@ -70,7 +75,10 @@ export default defineComponent({
   setup() {
     const rootStore = useRootStore();
     const refStore = useRefStore();
-    const selectedFolder = computed(() => rootStore.selectedFolder);
+    const mediaStore = useMediaStore();
+    const selectedFolder = computed<MediaFolder | null>(
+      () => mediaStore.focusedFolder
+    );
 
     const isProd = process.env.NODE_ENV === "production";
     const baseHost = isProd ? window.location.origin : "http://127.0.0.1";
@@ -80,10 +88,10 @@ export default defineComponent({
       () => rootStore.treeData,
       (val) => {
         if (val && typeof val === "object") {
-          if (!rootStore.selectedFolder) {
+          if (!mediaStore.focusedFolder) {
             const firstWithFiles = findFirstFolderWithFiles(val);
             if (firstWithFiles) {
-              rootStore.setSelectedFolder(firstWithFiles);
+              mediaStore.focusFolder(firstWithFiles as MediaFolder);
             }
           }
         }
@@ -156,7 +164,7 @@ export default defineComponent({
     }
 
     const currentFolder = computed(() => {
-      const sel = selectedFolder.value as any;
+      const sel = selectedFolder.value;
       if (hasFiles(sel)) return sel;
       return findFirstFolderWithFiles(rootStore.treeData) as any;
     });
@@ -174,27 +182,41 @@ export default defineComponent({
       }
     });
 
-    type FileItem = any;
+    type FileItem = MediaFile;
     const rawFileImages = computed(() => {
-      // If a file is explicitly selected from the tree, show only that file in the gallery
-      const explicitlySelected = rootStore.selectedFile as any | null;
-      const folder = currentFolder.value as any;
-      let files: FileItem[] = [];
+      // Only honor a single-file view when the tree explicitly triggered it
+      const previewSelection = mediaStore.previewFile;
+      const persistedSelection = mediaStore.selectedFile;
+      const folder = currentFolder.value as MediaFolder | null;
+      let files: MediaFile[] = [];
 
-      if (explicitlySelected) {
-        files = [explicitlySelected];
+      if (mediaStore.singleFilePreviewActive && previewSelection) {
+        files = [previewSelection];
       } else {
         if (folder) {
           if (Array.isArray(folder.files)) {
-            files = folder.files;
+            files = folder.files as MediaFile[];
           } else if (Array.isArray(folder.File)) {
-            files = folder.File;
+            files = folder.File as MediaFile[];
           } else if (folder.File) {
-            files = [folder.File];
+            files = [folder.File as MediaFile];
           }
         }
         if (!files || files.length === 0) {
-          files = collectAllFiles(rootStore.treeData).slice(0, 120);
+          const fallbackFiles = collectAllFiles(rootStore.treeData).slice(
+            0,
+            120
+          ) as MediaFile[];
+          files = fallbackFiles.filter((f): f is MediaFile => !!f);
+        }
+        if (
+          (!files || files.length === 0) &&
+          (previewSelection || persistedSelection)
+        ) {
+          const fallbackSelection = previewSelection || persistedSelection;
+          if (fallbackSelection) {
+            files = [fallbackSelection];
+          }
         }
       }
       if (files.length > 0) {
@@ -351,9 +373,11 @@ export default defineComponent({
     );
 
     const selectFile = (index: number) => {
-      const file = finalImages.value[index].rawFile;
-      rootStore.setSelectedFile(file);
-      rootStore.newSchedule.metaData = file.Data || {};
+      const file = finalImages.value[index].rawFile as MediaFile;
+      mediaStore.commitSelection(file);
+      rootStore.newSchedule.metaData =
+        (file.Data as typeof rootStore.newSchedule.metaData | undefined) ||
+        rootStore.newSchedule.metaData;
       refStore.showMediaDialog = false;
     };
 
@@ -383,6 +407,7 @@ export default defineComponent({
 .thumbnail {
   width: 100%;
   height: auto;
+  cursor: pointer;
   object-fit: contain;
   display: block;
   border-radius: 8px;

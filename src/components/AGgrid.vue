@@ -53,6 +53,7 @@ import {
   type ITooltipParams,
   type GridReadyEvent,
   type FilterModel,
+  type GetRowIdParams,
 } from "ag-grid-community";
 import {
   RowGroupingModule,
@@ -259,6 +260,9 @@ export default defineComponent({
     // Grid options.
     const gridOptions = ref<GridOptions>({
       theme: refStore.isDarkMode ? darkTheme : lightTheme,
+      // Preserve scroll position and enable efficient row updates
+      suppressScrollOnNewData: true,
+      getRowId: (params: GetRowIdParams) => (params.data as Item)?.id,
       rowSelection: {
         mode: "multiRow",
         enableClickSelection: true,
@@ -280,20 +284,20 @@ export default defineComponent({
       rowHeight: 60,
       headerHeight: 40,
       columnDefs: [
-        { field: "profile", maxWidth: 150 },
-        { field: "scheduleTypes", maxWidth: 150 },
+        { field: "profile", width: 50 },
+        { field: "scheduleTypes", width: 50 },
         {
           field: "status",
           headerName: "Status",
           cellRenderer: StatusCellRender,
           valueGetter: (params: ValueGetterParams) =>
             (params.data as Item)?.status, // Ensure grouping uses computed status
-          maxWidth: 150,
+          width: 50,
           enableRowGroup: true,
         },
         {
           field: "priority",
-          maxWidth: 200,
+          width: 200,
           cellRenderer: priorityCellRenderer,
           cellClass: "priority-cell-col",
           editable: () => isLoggedIn.value,
@@ -312,8 +316,6 @@ export default defineComponent({
           editable: () => isLoggedIn.value,
           cellEditorPopup: true,
           cellEditorPopupPosition: "under",
-          minWidth: 350,
-          maxWidth: 350,
         },
         {
           field: "specificTimes",
@@ -323,7 +325,7 @@ export default defineComponent({
           editable: () => isLoggedIn.value,
           cellEditorPopup: true,
           cellEditorPopupPosition: "under",
-          maxWidth: 450,
+
           cellStyle: {
             alignItems: "flex-start",
             justifyContent: "flex-start",
@@ -518,7 +520,6 @@ export default defineComponent({
           headerName: "Tags",
           cellRenderer: TagsCellRenderer,
           cellEditor: TagsCellEditor,
-          minWidth: 400,
           editable: () => isLoggedIn.value,
           valueSetter: (params: ValueSetterParams) => {
             params.data.scheduleTags = params.newValue;
@@ -530,14 +531,12 @@ export default defineComponent({
           field: "images",
           headerName: "Images",
           cellRenderer: ImagesCellRenderer,
-          minWidth: 400,
         },
         {
           field: "metaData.duration",
           headerName: "Duration",
           cellRenderer: DurationCellRender,
           cellEditor: DurationCellEditor,
-          minWidth: 180,
           // Allow edit only when logged in, and not when MediaInfo has a timecode-derived duration
           editable: (params: { data?: ItemWithMeta }) => {
             if (!isLoggedIn.value) return false;
@@ -563,12 +562,10 @@ export default defineComponent({
           field: "actions",
           headerName: "Actions",
           cellRenderer: ActionsCellRenderer,
-          maxWidth: 250,
         },
       ],
       defaultColDef: {
         flex: 1,
-        minWidth: 100,
         resizable:
           accountStore.account?.settings.general.resizableColumns || true,
         sortable: accountStore.account?.settings.general.sorting || true,

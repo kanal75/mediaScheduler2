@@ -1,4 +1,6 @@
 import { createApp } from "vue";
+// Patch: silence dev overlay ResizeObserver loop errors (harmless in Chrome)
+import "@/utils/patchResizeObserverError";
 import PrimeVue from "primevue/config";
 // Import PrimeVue core and theme CSS files
 import "primeflex/primeflex.css"; // optional, if you want PrimeFlex for layout

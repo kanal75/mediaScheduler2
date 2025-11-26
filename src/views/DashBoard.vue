@@ -16,11 +16,27 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, defineAsyncComponent } from "vue";
 import { useRefStore } from "@/store/RefStore";
-const LayoutPanel = defineAsyncComponent(
+// helper: retry once on transient ChunkLoadError (dev HMR hiccups)
+function withChunkRetry(loader: () => Promise<unknown>) {
+  return defineAsyncComponent({
+    loader: loader as () => Promise<any>,
+    onError(error, retry, fail, attempts) {
+      const message = (error && (error as Error).message) || "";
+      const isChunkError = /ChunkLoadError|Loading chunk/i.test(message);
+      if (isChunkError && attempts <= 1) {
+        retry();
+      } else {
+        fail();
+      }
+    },
+  });
+}
+
+const LayoutPanel = withChunkRetry(
   () => import("@/components/LayoutPanel.vue")
 );
-const AGgrid = defineAsyncComponent(() => import("@/components/AGgrid.vue"));
-const SystemEditDialog = defineAsyncComponent(
+const AGgrid = withChunkRetry(() => import("@/components/AGgrid.vue"));
+const SystemEditDialog = withChunkRetry(
   () => import("@/components/NewSchedule/SystemEditDialog.vue")
 );
 import { useRootStore } from "@/store/RootStore";

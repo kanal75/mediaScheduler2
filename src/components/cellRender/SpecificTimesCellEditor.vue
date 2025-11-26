@@ -1,7 +1,6 @@
 <template>
   <div class="stce-root stce-single-row-compact">
     <div class="stce-input-group">
-      <span class="stce-input-group-addon">Specific Times</span>
       <div class="stce-input-group-content">
         <div v-if="enabled">
           <div v-for="(item, idx) in localRanges" :key="idx" class="stce-row">
@@ -364,16 +363,19 @@ export default defineComponent({
   /* Follow AG Grid / PrimeVue / Element theme variables with sensible fallbacks */
   background: var(
     --ag-background-color,
-    var(--p-surface-0, var(--p-surface-card, var(--el-bg-color, #ffffff)))
+    var(--p-surface-0, var(--p-surface-card, var(--el-bg-color, #111827)))
   );
-  color: var(--ag-foreground-color, var(--el-text-color-regular, inherit));
+  color: var(
+    --ag-foreground-color,
+    var(--el-text-color-regular, var(--p-text-color, #f9fafb))
+  );
   padding: 8px;
   border-radius: 6px;
 }
 .stce-input-group {
   display: flex;
   align-items: stretch;
-  border: 1px solid #d1d5db;
+  border: 1px solid #9ca3af;
   border-radius: 6px;
   overflow: hidden;
 }
@@ -381,14 +383,13 @@ export default defineComponent({
   display: flex;
   align-items: center;
   padding: 0 1rem;
-  color: var(--input-group-addon-color, var(--el-text-color-regular, #ffffff));
-  font-weight: 500;
-  border-right: 1px solid var(--input-border-color, #d1d5db);
+  /* text color, background, and font weight now come from global .p-inputgroup-addon */
+  border-right: 1px solid var(--input-border-color, #9ca3af);
   min-width: 120px;
 }
 .stce-switch-addon {
   border-right: none;
-  border-left: 1px solid var(--input-border-color, #d1d5db);
+  border-left: 1px solid var(--input-border-color, #9ca3af);
   min-width: 60px;
   justify-content: center;
 }
@@ -420,12 +421,10 @@ export default defineComponent({
   min-width: 32px;
   padding: 2px 6px;
   border-radius: 4px;
-  border: 1px solid var(--input-border-color, #d1d5db);
-  background: var(--el-fill-color, var(--p-input-bg, inherit));
-  color: var(
-    --ms-btn-fg,
-    var(--el-text-color-regular, var(--p-text-color, #1f2937))
-  );
+  border: 1px solid var(--input-border-color, #9ca3af);
+  /* let PrimeVue theme drive colors */
+  background: transparent;
+  color: inherit;
   cursor: pointer;
   font-size: 0.85rem;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
@@ -435,21 +434,12 @@ export default defineComponent({
 .stce-weekday-btn .p-button-label {
   color: inherit !important;
 }
-@media (prefers-color-scheme: dark) {
-  .stce-weekday-btn {
-    border-color: var(--el-border-color, #444);
-  }
-}
+/* (color overrides removed to follow PrimeVue theme) */
 .stce-weekday-btn.selected {
-  /* Use app-specific vars with safe defaults to avoid theme white-on-white */
-  background: var(--ms-selected-bg, #1976d2) !important;
-  color: var(--ms-selected-fg, #ffffff) !important;
-  border-color: var(--ms-selected-bg, #1976d2) !important;
-}
-.stce-weekday-btn.selected:hover,
-.stce-weekday-btn.selected:focus {
-  background: var(--ms-selected-bg-hover, #1e73c7) !important;
-  border-color: var(--ms-selected-bg-hover, #1e73c7) !important;
+  /* Bright, consistent blue for selected days */
+  background: #3b82f6 !important; /* brighter blue */
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
 }
 /* PrimeVue Button label should inherit */
 .stce-weekday-btn.selected :deep(.p-button-label),
@@ -460,18 +450,18 @@ export default defineComponent({
 .stce-weekday-btn.p-button.selected,
 .stce-weekday-btn.p-button-text.selected,
 .stce-weekday-btn.p-button-outlined.selected {
-  background: var(--ms-selected-bg, #1976d2) !important;
-  color: var(--ms-selected-fg, #ffffff) !important;
-  border-color: var(--ms-selected-bg, #1976d2) !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
 }
 @media (prefers-color-scheme: dark) {
   .stce-weekday-btn.selected,
   .stce-weekday-btn.p-button.selected,
   .stce-weekday-btn.p-button-text.selected,
   .stce-weekday-btn.p-button-outlined.selected {
-    background: var(--ms-selected-bg-dark, #1565c0) !important;
-    color: var(--ms-selected-fg-dark, #ffffff) !important;
-    border-color: var(--ms-selected-bg-dark, #1565c0) !important;
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border-color: #2563eb !important;
   }
 }
 .stce-all-day-checkbox {
@@ -487,27 +477,42 @@ export default defineComponent({
   gap: 4px;
 }
 .stce-schedule-input {
-  width: 100% !important;
-  max-width: 150px !important;
-  min-width: 150px !important;
+  /* Make the time inputs compact rather than stretching */
+  flex: 0 0 auto;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
   box-sizing: border-box;
   height: 32px;
-  font-size: 0.95rem;
-  padding: 2px 8px;
+  /* keep layout only; colors from PrimeVue */
+  background: transparent;
+  border-radius: 4px;
+  border: none;
 }
+/* Constrain the inner input width for PrimeVue Calendar */
+.stce-schedule-input :deep(.p-inputtext),
+.stce-schedule-input .p-inputtext {
+  width: 100px !important; /* fits HH:MM comfortably */
+  padding: 2px 8px !important;
+  font-size: 0.95rem !important;
+  line-height: 28px !important;
+  height: 28px !important;
+  /* no hard color overrides; use theme */
+}
+/* Also override PrimeVue input wrapper so it doesn't stay black */
+/* allow PrimeVue input wrapper styles without local overrides */
+/* Keep the trigger button compact as well */
+.stce-schedule-input :deep(.p-datepicker-trigger),
+.stce-schedule-input .p-datepicker-trigger {
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+}
+.stce-action-btn.p-button,
 .stce-action-btn {
   margin-left: 4px;
   margin-right: 4px;
-  border: 1px solid var(--input-border-color, #d1d5db);
-  background: var(
-    --ms-action-bg,
-    var(--el-fill-color, var(--p-input-bg, #ffffff))
-  );
-  color: var(
-    --ms-action-fg,
-    var(--el-text-color-regular, var(--p-text-color, #1f2937))
-  );
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  /* keep size/layout only; PrimeVue handles colors */
   height: 32px;
   min-width: 32px;
   font-size: 0.95rem;
@@ -516,42 +521,11 @@ export default defineComponent({
   align-items: center;
   justify-content: center;
 }
-.stce-action-btn.p-button,
-.stce-action-btn.p-button-success,
-.stce-action-btn.p-button-danger {
-  /* Ensure we override PrimeVue variant backgrounds */
-  background: var(
-    --ms-action-bg,
-    var(--el-fill-color, var(--p-input-bg, #ffffff))
-  ) !important;
-  color: var(
-    --ms-action-fg,
-    var(--el-text-color-regular, var(--p-text-color, #1f2937))
-  ) !important;
-  border-color: var(--input-border-color, #d1d5db) !important;
-}
-.stce-action-btn.p-button.p-component,
-.stce-action-btn.p-button-success.p-component,
-.stce-action-btn.p-button-danger.p-component {
-  background: var(
-    --ms-action-bg,
-    var(--el-fill-color, var(--p-input-bg, #ffffff))
-  ) !important;
-  background-color: var(
-    --ms-action-bg,
-    var(--el-fill-color, var(--p-input-bg, #ffffff))
-  ) !important;
-  color: var(
-    --ms-action-fg,
-    var(--el-text-color-regular, var(--p-text-color, #1f2937))
-  ) !important;
-  border-color: var(--input-border-color, #d1d5db) !important;
-  box-shadow: none !important;
-}
+/* remove explicit PrimeVue overrides; fall back to theme */
 .stce-action-btn:hover,
 .stce-action-btn:focus {
-  background: var(--ms-action-bg-hover, #e5e7eb) !important; /* slate-200 */
-  border-color: var(--ms-action-border-hover, #c7cdd4) !important;
+  background: #374151 !important;
+  border-color: #e5e7eb !important;
 }
 /* Ensure PrimeVue inner label inherits the computed color in all states */
 .stce-action-btn :deep(.p-button-label),
@@ -571,33 +545,6 @@ export default defineComponent({
 .stce-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-@media (prefers-color-scheme: dark) {
-  .stce-action-btn {
-    border-color: var(--el-border-color, #444);
-    background: var(--ms-action-bg-dark, var(--el-fill-color, #222));
-    color: var(--ms-action-fg-dark, var(--el-text-color-regular, #ffffff));
-  }
-  .stce-action-btn.p-button.p-component,
-  .stce-action-btn.p-button-success.p-component,
-  .stce-action-btn.p-button-danger.p-component {
-    background: var(--ms-action-bg-dark, var(--el-fill-color, #222)) !important;
-    background-color: var(
-      --ms-action-bg-dark,
-      var(--el-fill-color, #222)
-    ) !important;
-    color: var(
-      --ms-action-fg-dark,
-      var(--el-text-color-regular, #ffffff)
-    ) !important;
-    border-color: var(--el-border-color, #444) !important;
-    box-shadow: none !important;
-  }
-  .stce-action-btn:hover,
-  .stce-action-btn:focus {
-    background: var(--ms-action-bg-dark-hover, #2a2a2a) !important;
-    border-color: var(--ms-action-border-dark-hover, #555) !important;
-  }
 }
 .stce-actions {
   display: flex;

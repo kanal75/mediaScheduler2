@@ -5,9 +5,48 @@ html {
     sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
 }
 
+/* (PrimeVue global overrides removed to restore standard theme colors) */
+
 .p-tag {
   display: initial !important;
   /* ...existing code... */
+}
+
+/* Global tweak: ensure input group add-ons (like "Specific Times" title)
+   are readable in light mode by defaulting to a dark text color when
+   theme variables are not set. This keeps behavior aligned with
+   PrimeVue/Element vars but avoids white-on-white issues. */
+.p-inputgroup-addon,
+.custom-input-group-addon {
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: light) {
+
+  .p-inputgroup-addon,
+  .custom-input-group-addon {
+    color: #111827;
+    background-color: #f3f4f6;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+
+  /* Make date-range and time-range calendar buttons light in light mode */
+  .manual-calendar-tile {
+    background-color: #f9fafb !important;
+    border-color: #d1d5db !important;
+    color: #111827 !important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+
+  .p-inputgroup-addon,
+  .custom-input-group-addon {
+    color: #ffffff;
+    background-color: #111827;
+  }
 }
 
 ::v-deep(.p-multiselect-panel) {

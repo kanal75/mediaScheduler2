@@ -52,7 +52,7 @@
           label="Remove"
           severity="danger"
           class="mt-4"
-          @click="rootStore.selectedFile = null"
+          @click="removeSelectedFile"
         >
           <template #icon>
             <Icon name="trash" />
@@ -66,6 +66,7 @@
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
 import { useRootStore } from "@/store/RootStore";
+import { useMediaStore, type MediaFile } from "@/store/MediaStore";
 import { useSystemStore } from "@/store/SystemStore";
 import Card from "primevue/card";
 import Dialog from "primevue/dialog";
@@ -77,7 +78,10 @@ export default defineComponent({
   components: { Card, Dialog, Icon },
   setup() {
     const rootStore = useRootStore();
-    const selectedFile = computed(() => rootStore.selectedFile);
+    const mediaStore = useMediaStore();
+    const selectedFile = computed<MediaFile | null>(
+      () => mediaStore.selectedFile
+    );
     const systemStore = useSystemStore();
     // Header thumbnail: Use the file’s thumbnail (or a default image)
     const systemPngUrl = computed(() => {
@@ -133,6 +137,9 @@ export default defineComponent({
     const openDialog = () => {
       dialog.value = true;
     };
+    const removeSelectedFile = () => {
+      mediaStore.clearSelection();
+    };
     return {
       logo,
       rootStore,
@@ -145,6 +152,7 @@ export default defineComponent({
       selectedFileDuration,
       dialog,
       openDialog,
+      removeSelectedFile,
     };
   },
 });

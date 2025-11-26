@@ -30,6 +30,7 @@
 <script lang="ts">
 import { defineComponent, ref, watch, computed, onMounted } from "vue";
 import { useRootStore } from "@/store/RootStore";
+import { useMediaStore, type MediaFile } from "@/store/MediaStore";
 import InputNumber from "primevue/inputnumber";
 
 function secondsToTimecode(seconds: number): string {
@@ -69,6 +70,7 @@ export default defineComponent({
   emits: ["update:modelValue"],
   setup(props, { emit }) {
     const rootStore = useRootStore();
+    const mediaStore = useMediaStore();
     const localError = ref(false);
     const t = computed(() =>
       (rootStore.newSchedule.scheduleTypes || "").toLowerCase()
@@ -133,12 +135,22 @@ export default defineComponent({
       }
     });
     watch(
-      () => rootStore.selectedFile,
-      (file) => {
-        if (file && file.Data && !isDisabled.value) {
-          let seconds = displaySeconds.value || 20;
-          file.Data.duration = secondsToTimecode(seconds);
+      () => mediaStore.selectedFile,
+      (file: MediaFile | null) => {
+        if (!file || !file.Data || isDisabled.value) {
+          return;
         }
+        const seconds = displaySeconds.value || 20;
+        if (!file.Data.MediaInfo) {
+          file.Data.MediaInfo = {};
+        }
+        if (
+          !file.Data.MediaInfo.Durations ||
+          file.Data.MediaInfo.Durations.length === 0
+        ) {
+          file.Data.MediaInfo.Durations = [{}];
+        }
+        file.Data.MediaInfo.Durations[0].TimeCode = secondsToTimecode(seconds);
       },
       { immediate: true }
     );
@@ -197,7 +209,9 @@ export default defineComponent({
   display: flex;
   align-items: center;
   padding: 0 1rem;
-  font-weight: 500;
+  color: inherit;
+  background-color: transparent;
+  font-weight: inherit;
   border-right: 1px solid var(--input-border-color, #d1d5db);
   min-width: 90px;
   min-height: 52px;

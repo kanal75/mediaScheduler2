@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 import { useNotificationStore } from "./NotificationStore";
+import { useMediaStore } from "./MediaStore";
 import type {
   Group,
   Tag,
@@ -13,6 +14,33 @@ import type {
   Item,
   Schedule,
 } from "@/types";
+// Shared status calculation for schedules
+function computeStatus(schedule: Item): string {
+  // If status is 'Paused', do not change it
+  if (schedule.status === "Paused") return schedule.status;
+  const timePicker = schedule.timePicker;
+  let status = "Unscheduled";
+  if (Array.isArray(timePicker) && timePicker.length === 2) {
+    const [startStr, endStr] = timePicker;
+    const start = dayjs(startStr, "YYYY-MM-DD HH:mm", true);
+    const end = dayjs(endStr, "YYYY-MM-DD HH:mm", true);
+    if (start.isValid() && end.isValid()) {
+      const now = dayjs();
+      if (now.isAfter(end)) {
+        status = "Passed";
+      } else if (now.isBefore(start)) {
+        status = "Scheduled";
+      } else if (
+        (now.isAfter(start) && now.isBefore(end)) ||
+        now.isSame(start) ||
+        now.isSame(end)
+      ) {
+        status = "Active";
+      }
+    }
+  }
+  return status;
+}
 
 // Define your API base URL based on the environment.
 const isProd = process.env.NODE_ENV === "production";
@@ -35,8 +63,7 @@ export const useRootStore = defineStore("RootStore", {
     editingScheduleId: string | null;
     newSchedule: NewSchedule;
     treeData: TreeNode | null;
-    selectedFolder: any | null;
-    selectedFile: any | null;
+    suppressTypeRestore: boolean;
     profiles: string[];
     scheduleTypes: string[];
   } => ({
@@ -67,8 +94,9 @@ export const useRootStore = defineStore("RootStore", {
       },
     },
     treeData: null,
-    selectedFolder: null,
-    selectedFile: null,
+    // When true, UI watchers should ignore programmatic resets (used to
+    // prevent accidental restoration of previous values during reset).
+    suppressTypeRestore: false,
     profiles: [],
     scheduleTypes: [],
   }),
@@ -173,33 +201,7 @@ export const useRootStore = defineStore("RootStore", {
         if (!schedule.scheduleTags) {
           schedule.scheduleTags = [];
         }
-        // If status is 'Paused', do not change it
-        if (schedule.status === "Paused") {
-          return;
-        }
-        // Compute status from timePicker
-        const timePicker = schedule.timePicker;
-        let status = "Unscheduled";
-        if (Array.isArray(timePicker) && timePicker.length === 2) {
-          const [startStr, endStr] = timePicker;
-          const start = dayjs(startStr, "YYYY-MM-DD HH:mm", true);
-          const end = dayjs(endStr, "YYYY-MM-DD HH:mm", true);
-          if (start.isValid() && end.isValid()) {
-            const now = dayjs();
-            if (now.isAfter(end)) {
-              status = "Passed";
-            } else if (now.isBefore(start)) {
-              status = "Scheduled";
-            } else if (
-              (now.isAfter(start) && now.isBefore(end)) ||
-              now.isSame(start) ||
-              now.isSame(end)
-            ) {
-              status = "Active";
-            }
-          }
-        }
-        schedule.status = status;
+        schedule.status = computeStatus(schedule);
       });
 
       this.schedules = tempArray.sort(
@@ -344,16 +346,6 @@ export const useRootStore = defineStore("RootStore", {
       }
     },
 
-    // New action to set the currently selected folder.
-    setSelectedFolder(folder: unknown) {
-      this.selectedFolder = folder;
-    },
-
-    // New action to set the currently selected file.
-    setSelectedFile(file: unknown) {
-      this.selectedFile = file;
-    },
-
     async putNewSchedule(newSchedule: NewSchedule) {
       try {
         const response = await axios.put(
@@ -367,7 +359,29 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Schedule saved successfully.",
           life: 3000,
         });
-        await this.fetchSchedules();
+        // Insert or update locally to avoid full refetch
+        const existsIdx = this.schedules.findIndex(
+          (s: Item) => s.id === (newSchedule as unknown as Item).id
+        );
+        const asItem = newSchedule as unknown as Item;
+        // Ensure defaults
+        if (!asItem.scheduleTags) asItem.scheduleTags = [];
+        asItem.status = computeStatus(asItem);
+        if (existsIdx !== -1) {
+          // Merge into existing
+          this.schedules[existsIdx] = {
+            ...this.schedules[existsIdx],
+            ...asItem,
+          };
+        } else {
+          // Add and keep sort order consistent with addTimestamp desc if available
+          this.schedules.push(asItem);
+          this.schedules.sort(
+            (a, b) =>
+              dayjs(b.bonsaiXmlDB.addTimestamp).valueOf() -
+              dayjs(a.bonsaiXmlDB.addTimestamp).valueOf()
+          );
+        }
         return response.data;
       } catch (error) {
         const notificationStore = useNotificationStore();
@@ -399,7 +413,25 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Schedule saved successfully.",
           life: 3000,
         });
-        await this.fetchSchedules();
+        // Update locally in place to avoid full refetch and prevent grid scroll reset
+        const idx = this.schedules.findIndex((s: Item) => s.id === schedule.id);
+        // Recompute status unless paused
+        const updated: Item = { ...schedule };
+        if (!updated.scheduleTags) updated.scheduleTags = [];
+        updated.status = computeStatus(updated);
+        if (idx !== -1) {
+          this.schedules[idx] = {
+            ...this.schedules[idx],
+            ...updated,
+          };
+        } else {
+          this.schedules.push(updated);
+          this.schedules.sort(
+            (a, b) =>
+              dayjs(b.bonsaiXmlDB.addTimestamp).valueOf() -
+              dayjs(a.bonsaiXmlDB.addTimestamp).valueOf()
+          );
+        }
         return response.data;
       } catch (error) {
         const notificationStore = useNotificationStore();
@@ -425,7 +457,9 @@ export const useRootStore = defineStore("RootStore", {
           detail: "Schedule deleted successfully.",
           life: 3000,
         });
-        await this.fetchSchedules();
+        // Remove locally instead of refetching all
+        const idx = this.schedules.findIndex((s: Item) => s.id === schedule.id);
+        if (idx !== -1) this.schedules.splice(idx, 1);
       } catch (error) {
         const notificationStore = useNotificationStore();
         notificationStore.showToast({
@@ -442,12 +476,15 @@ export const useRootStore = defineStore("RootStore", {
       }
     },
     resetMedia() {
-      this.selectedFile = null;
-      this.selectedFolder = null;
+      const mediaStore = useMediaStore();
+      mediaStore.resetAll();
       this.editingScheduleId = null;
     },
 
     resetNewSchedule() {
+      // Temporarily suppress watchers that would restore the schedule type
+      // when we intentionally clear the model.
+      this.suppressTypeRestore = true;
       // Reset each property individually for reactivity
       Object.assign(this.newSchedule, {
         id: "",
@@ -470,6 +507,10 @@ export const useRootStore = defineStore("RootStore", {
         },
       });
       this.resetMedia();
+      // Re-enable watchers - this is synchronous and runs after assignments
+      // so watchers that observe the cleared values should see suppressTypeRestore
+      // and avoid restoring programmatic clears.
+      this.suppressTypeRestore = false;
     },
 
     // Add a new tag to a group and push to API (creates group if missing)
